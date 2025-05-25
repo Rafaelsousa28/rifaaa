@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RifaMax - O Futuro das Rifas</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="grid-bg"></div>
+
+    <header id="header">
+        <nav class="container">
+            <div class="logo" onclick="showPage('home')">RIFAMAX</div>
+            
+            <ul class="nav-menu">
+                <li><a href="#" class="nav-link" onclick="showPage('home')">Início</a></li>
+                <li><a href="#" class="nav-link" onclick="showPage('winners')">Ganhadores</a></li>
+                <li><a href="#" class="nav-link" onclick="showPage('my-tickets')">Minhas Cotas</a></li>
+                <li><a href="#" class="nav-link" onclick="showPage('terms')">Termos</a></li>
+                <li><a href="#" class="nav-link" onclick="showPage('contact')">Contato</a></li>
+                <li><button class="btn" id="authBtn" onclick="openLoginModal()"><span>Entrar</span></button></li>
+            </ul>
+
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </nav>
+    </header>
+
+    <div class="mobile-sidebar" id="mobileSidebar">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <div class="logo" onclick="showPage('home'); toggleMobileMenu();">RIFAMAX</div>
+            <button class="close-modal" onclick="toggleMobileMenu()">✕</button>
+        </div>
+        
+        <nav style="display: flex; flex-direction: column; gap: 1rem;">
+            <a href="#" class="nav-link" onclick="showPage('home'); toggleMobileMenu()">Início</a>
+            <a href="#" class="nav-link" onclick="showPage('winners'); toggleMobileMenu()">Ganhadores</a>
+            <a href="#" class="nav-link" onclick="showPage('my-tickets'); toggleMobileMenu()">Minhas Cotas</a>
+            <a href="#" class="nav-link" onclick="showPage('terms'); toggleMobileMenu()">Termos</a>
+            <a href="#" class="nav-link" onclick="showPage('contact'); toggleMobileMenu()">Contato</a>
+            <button class="btn btn-primary" style="margin-top: 2rem;" onclick="openLoginModal(); toggleMobileMenu()">
+                <span>Entrar</span>
+            </button>
+        </nav>
+    </div>
+
+    <div class="page-content">
+        <div class="page active" id="home">
+            <section class="hero">
+                <div class="container">
+                    <h1>O Futuro das Rifas</h1>
+                    <p>Experiência digital revolucionária com sorteios transparentes e seguros</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('mainRafflesAnchor').scrollIntoView({ behavior: 'smooth' })">
+                        <span>Explorar Rifas</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="main-raffle" id="mainRafflesAnchor">
+                <div class="container">
+                    <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem; color: var(--primary);">
+                        ⚡ Destaque Principal
+                    </h2>
+                    <div id="mainRaffleContainer">
+                        </div>
+                </div>
+            </section>
+
+            <section style="padding: 4rem 0;">
+                <div class="container">
+                    <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem;">
+                        Todas as Campanhas
+                    </h2>
+                    <div class="campaigns-grid" id="campaignsGrid">
+                        </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="page" id="raffle-details-page">
+            <div class="container" id="raffleDetailsContainer" style="padding-top: 2rem; padding-bottom: 2rem;">
+                </div>
+        </div>
+
+        <div class="page" id="admin">
+            <div class="container">
+                <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem; color: var(--primary);">
+                    Painel de Controle
+                </h2>
+                
+                <div class="admin-panel">
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" onclick="showAdminTab('dashboard')">Dashboard</button>
+                        <button class="admin-tab" onclick="showAdminTab('raffles')">Rifas</button>
+                        <button class="admin-tab" onclick="showAdminTab('sales')">Vendas</button>
+                        <button class="admin-tab" onclick="showAdminTab('create')">Nova Rifa</button>
+                    </div>
+
+                    <div class="admin-content active" id="admin-dashboard">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number" id="totalRevenue">R$ 0</div>
+                                <div class="stat-label">Receita Total</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="totalTickets">0</div>
+                                <div class="stat-label">Cotas Vendidas</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="activeUsers">0</div>
+                                <div class="stat-label">Usuários Ativos</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="activeRaffles">0</div>
+                                <div class="stat-label">Rifas Ativas</div>
+                            </div>
+                        </div>
+                        <div class="charts-grid">
+                            <div class="cyber-card chart-container">
+                                <h4 style="color: var(--primary); margin-bottom: 1rem; text-align: center;">Progresso das Rifas Ativas</h4>
+                                <canvas id="activeRafflesProgressChart"></canvas>
+                            </div>
+                            <div class="cyber-card chart-container">
+                                <h4 style="color: var(--primary); margin-bottom: 1rem; text-align: center;">Vendas nos Últimos 7 Dias</h4>
+                                <canvas id="salesLast7DaysChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="cyber-card" style="margin-top: 3rem; padding: 2rem;">
+                            <h3 style="color: var(--primary); margin-bottom: 1.5rem; text-align: center; font-size: 1.5rem;">
+                                🔍 Consultar Detalhes de uma Rifa Específica
+                            </h3>
+                            <div class="form-group">
+                                <label for="dashboardRaffleSelect">Selecione uma Rifa:</label>
+                                <select class="form-input" id="dashboardRaffleSelect" onchange="handleDashboardRaffleSelectChange(this)">
+                                    <option value="">-- Escolha uma rifa --</option>
+                                </select>
+                            </div>
+                            <div id="dashboardRaffleQuickStats" style="margin-top: 1rem; text-align: center;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-content" id="admin-raffles">
+                        <h3 style="margin-bottom: 1.5rem;">Gerenciar Rifas</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Título</th>
+                                        <th>Preço</th>
+                                        <th>Vendidos (Aprov.)</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rafflesTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="admin-content" id="admin-sales">
+                        <h3 style="margin-bottom: 1.5rem;">Histórico de Vendas</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Cliente</th>
+                                        <th>Rifa</th>
+                                        <th>Cotas</th>
+                                        <th>Valor</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="salesTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="admin-content" id="admin-create">
+                        <h3 style="margin-bottom: 1.5rem;" id="adminCreateEditTitle">Criar Nova Rifa</h3>
+                        <form onsubmit="createRaffle(event)" id="createRaffleForm">
+                            <div class="form-group">
+                                <label>Imagem da Rifa</label>
+                                <input type="file" id="raffleImageInput" accept="image/*" style="display: none;" onchange="previewImage(event)">
+                                <div class="image-upload-area" onclick="document.getElementById('raffleImageInput').click()">
+                                    <div class="upload-placeholder" id="uploadPlaceholder">
+                                        <i>📸</i>
+                                        <p>Clique para adicionar imagem</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Título da Rifa</label>
+                                <input type="text" class="form-input" id="raffleTitle" required placeholder="Ex: iPhone 15 Pro Max">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div class="form-group">
+                                    <label>Valor por Cota (R$)</label>
+                                    <input type="number" class="form-input" id="rafflePrice" step="0.01" min="0.01" required placeholder="0,00">
+                                </div>
+                                <div class="form-group">
+                                    <label>Total de Cotas</label>
+                                    <input type="number" class="form-input" id="raffleTotalNumbers" min="1" required placeholder="1000">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Descrição</label>
+                                <textarea class="form-input" id="raffleDescription" rows="4" required placeholder="Descreva o prêmio e as regras"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Método/Local do Sorteio</label>
+                                <input type="text" class="form-input" id="raffleDrawMethod" placeholder="Ex: Loteria Federal, Sorteio ao vivo no Instagram @usuario">
+                            </div>
+                            <div class="form-group">
+                                <label>Ícone (Emoji)</label>
+                                <input type="text" class="form-input" id="raffleIcon" placeholder="Ex: 📱" maxlength="2">
+                            </div>
+                            <div class="form-group">
+                                <label>Cotas Premiadas (formato: numero:prêmio,numero:prêmio)</label>
+                                <input type="text" class="form-input" id="rafflePrizeQuotas" placeholder="Ex: 10:Prêmio R$50,50:Bônus,100:Vale Compras">
+                            </div>
+                            <div class="cyber-toggle">
+                                <div class="toggle-switch" id="highlightToggle" onclick="this.classList.toggle('active')"></div>
+                                <label>Destacar como rifa principal</label>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 2rem;">
+                                <span id="createRaffleSubmitBtnText">Criar Rifa</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page" id="winners">
+            <div class="container">
+                <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem; color: var(--primary);">
+                    🏆 Hall dos Campeões
+                </h2>
+                <div class="winners-grid" id="winnersGrid"></div>
+            </div>
+        </div>
+
+        <div class="page" id="my-tickets">
+            <div class="container">
+                <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem;">
+                    Minhas Cotas
+                </h2>
+                <div class="search-container">
+                    <h3 style="margin-bottom: 1.5rem;">Consultar por Telefone</h3>
+                    <div class="search-input-group">
+                        <div class="phone-input-group" style="flex: 1;">
+                            <select class="country-select" id="countryCode">
+                                <option value="+55">🇧🇷 +55</option>
+                            </select>
+                            <input type="tel" class="form-input" id="phoneSearch" placeholder="(00) 00000-0000">
+                        </div>
+                        <button class="btn btn-primary" onclick="searchTickets()"><span>Buscar</span></button>
+                    </div>
+                    <div class="search-results" id="searchResults" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page" id="terms">
+            <div class="container">
+                <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem;">Termos de Uso</h2>
+                <div class="cyber-card">
+                    <h3 style="color: var(--primary); margin-bottom: 1rem;">1. Aceitação dos Termos</h3>
+                    <p style="color: var(--text-secondary); line-height: 1.8;">
+                        Ao utilizar a plataforma RifaMax, você concorda com todos os termos e condições estabelecidos.
+                    </p>
+                    <h3 style="color: var(--primary); margin: 2rem 0 1rem;">2. Funcionamento</h3>
+                    <p style="color: var(--text-secondary); line-height: 1.8;">
+                        As rifas são realizadas quando todas as cotas são vendidas ou na data estipulada. O sistema garante transparência total no processo.
+                    </p>
+                    <h3 style="color: var(--primary); margin: 2rem 0 1rem;">3. Pagamentos</h3>
+                    <p style="color: var(--text-secondary); line-height: 1.8;">
+                        Aceitamos PIX e cartões. Todos os pagamentos são processados com segurança.
+                    </p>
+                    <h3 style="color: var(--primary); margin: 2rem 0 1rem;">4. Sorteios</h3>
+                    <p style="color: var(--text-secondary); line-height: 1.8;">
+                        Os sorteios são realizados conforme o método descrito em cada rifa, garantindo imparcialidade.
+                    </p>
+                    <h3 style="color: var(--primary); margin: 2rem 0 1rem;">5. Privacidade</h3>
+                    <p style="color: var(--text-secondary); line-height: 1.8;">
+                        Seus dados são protegidos e utilizados conforme nossa política de privacidade.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="page" id="contact">
+            <div class="container">
+                <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem; color: var(--primary);">Entre em Contato</h2>
+                <div class="cyber-card" style="max-width: 600px; margin: 0 auto;">
+                    <form onsubmit="sendContact(event)">
+                        <div class="form-group">
+                            <label>Nome</label>
+                            <input type="text" class="form-input" id="contactName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Telefone</label>
+                            <div class="phone-input-group">
+                                <select class="country-select" id="contactCountryCode">
+                                    <option value="+55">🇧🇷 +55</option>
+                                </select>
+                                <input type="tel" class="form-input" id="contactPhone" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Mensagem</label>
+                            <textarea class="form-input" id="contactMessage" rows="4" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;"><span>Enviar Mensagem</span></button>
+                    </form>
+                    <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--glass-border);">
+                        <h4 style="color: var(--primary); margin-bottom: 1rem;">Outros Canais</h4>
+                        <p style="color: var(--text-secondary);">📱 WhatsApp: +55 11 99999-9999</p>
+                        <p style="color: var(--text-secondary);">📧 Email: contato@rifamax.com</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fab" onclick="scrollToTop()"><i>⬆</i></div>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>RifaMax</h4>
+                    <p>O futuro das rifas digitais com tecnologia de ponta</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links Rápidos</h4>
+                    <a href="#" onclick="showPage('home')">Início</a>
+                    <a href="#" onclick="showPage('winners')">Ganhadores</a>
+                    <a href="#" onclick="showPage('terms')">Termos</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Contato</h4>
+                    <p>📱 +55 11 99999-9999</p>
+                    <p>📧 contato@rifamax.com</p>
+                </div>
+            </div>
+            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--glass-border);">
+                <p style="color: var(--text-muted);">&copy; 2025 RifaMax. Todos os direitos reservados.</p>
+                <button class="btn" style="margin-top: 1rem;" onclick="requestAdminAccess()"><span>Admin</span></button>
+            </div>
+        </div>
+    </footer>
+
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Acessar Conta</h2>
+                <button class="close-modal" onclick="closeModal('loginModal')">✕</button>
+            </div>
+            <form onsubmit="login(event)">
+                <div class="form-group">
+                    <label>Telefone</label>
+                    <div class="phone-input-group">
+                        <select class="country-select" id="loginCountryCode">
+                            <option value="+55">🇧🇷 +55</option>
+                            <option value="+1">🇺🇸 +1</option>
+                        </select>
+                        <input type="tel" class="form-input" id="loginPhone" placeholder="(00) 00000-0000" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nome Completo</label>
+                    <input type="text" class="form-input" id="loginName" placeholder="Seu nome" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;"><span>Entrar</span></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="purchaseModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="purchaseTitle">Comprar Cotas</h2>
+                <button class="close-modal" onclick="closeModal('purchaseModal')">✕</button>
+            </div>
+            <div id="purchasePromoInfo" style="display:none; margin-bottom: 1rem;"></div>
+            <div class="cyber-card" style="margin-bottom: 2rem;">
+                <h4 style="color: var(--primary); margin-bottom: 1rem;">📋 Regulamento e Detalhes</h4>
+                <div id="raffleDescriptionModal" style="color: var(--text-secondary); line-height: 1.6; max-height: 150px; overflow-y: auto;"></div>
+            </div>
+            <div style="text-align: center; margin: 2rem 0;">
+                <div style="display: inline-block; padding: 2rem; background: var(--glass-bg); border-radius: 20px; border: 1px solid var(--primary);">
+                    <h3 style="color: var(--primary); margin-bottom: 1rem;">🎁 Números Surpresa!</h3>
+                    <p style="color: var(--text-secondary);">Seus números serão revelados após o pagamento</p>
+                </div>
+            </div>
+            <div class="quantity-selector">
+                <button class="quantity-btn" onclick="decreaseQuantity()">-</button>
+                <div class="quantity-display" id="quantityDisplay">1</div>
+                <button class="quantity-btn" onclick="increaseQuantity()">+</button>
+            </div>
+            <div class="quick-select">
+                <button class="quick-select-btn" onclick="setQuantity(1)">+1</button>
+                <button class="quick-select-btn" onclick="setQuantity(5)">+5</button>
+                <button class="quick-select-btn" onclick="setQuantity(10)">+10</button>
+                <button class="quick-select-btn" onclick="setQuantity(50)">+50</button>
+                <button class="quick-select-btn" onclick="setQuantity(100)">+100</button>
+                <button class="quick-select-btn" onclick="setQuantity(500)">+500</button>
+                <button class="quick-select-btn" onclick="setQuantity(1000)">+1000</button>
+                <button class="quick-select-btn" onclick="setQuantity(5000)">+5000</button>
+            </div>
+            <div style="text-align: center; margin: 2rem 0; padding: 1.5rem; background: var(--glass-bg); border-radius: 15px;">
+                <h3 style="color: var(--primary); font-size: 2rem;" id="totalPrice">R$ 0,00</h3>
+            </div>
+            <h4 style="margin-bottom: 1rem;">Forma de Pagamento</h4>
+            <div class="payment-methods">
+                <div class="payment-method" onclick="selectPayment('pix')">
+                    <div class="payment-icon">📱</div>
+                    <div>PIX</div>
+                </div>
+                <div class="payment-method" onclick="selectPayment('card')">
+                    <div class="payment-icon">💳</div>
+                    <div>Cartão</div>
+                </div>
+            </div>
+            <div id="paymentDetails" style="margin-top: 2rem;"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="successModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Compra Realizada!</h2>
+                <button class="close-modal" onclick="closeModal('successModal')">✕</button>
+            </div>
+            <div class="success-animation">
+                <div class="success-icon">
+                    <div class="success-circle"><div class="success-check"></div></div>
+                </div>
+                <h3 style="color: var(--primary); margin-bottom: 1rem;">Parabéns!</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Sua compra foi processada com sucesso</p>
+                <div style="background: var(--glass-bg); border-radius: 15px; padding: 1.5rem; margin-bottom: 2rem;">
+                    <h4 style="color: var(--primary); margin-bottom: 1rem;">Seus Números da Sorte:</h4>
+                    <div class="ticket-numbers" id="successNumbers"></div>
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('successModal'); showPage('my-tickets');"><span>Ver Minhas Cotas</span></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="adminLoginModal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Acesso Admin</h2>
+                <button class="close-modal" onclick="closeModal('adminLoginModal')">✕</button>
+            </div>
+            <form onsubmit="adminLogin(event)">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🔐</div>
+                    <p style="color: var(--text-secondary);">Área Restrita</p>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-input" id="adminEmail" required>
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" class="form-input" id="adminPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;"><span>Entrar</span></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="adminRaffleDetailModal">
+        <div class="modal-content" style="max-width: 900px; max-height: 95vh;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="adminRaffleDetailTitle">Detalhes da Rifa</h2>
+                <button class="close-modal" onclick="closeModal('adminRaffleDetailModal')">✕</button>
+            </div>
+            <div id="adminRaffleDetailContent"></div>
+            <div class="detail-card" style="grid-column: 1 / -1; text-align:right; margin-top:1rem;">
+                 <button class="btn" id="adminEditRaffleBtnFromDetail" style="border-color:var(--warning); color:var(--warning);">
+                    <span>✏️ Editar Rifa</span>
+                </button>
+            </div>
+            <div id="adminRaffleSalesManagement" style="margin-top: 2rem;">
+                <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Gerenciamento de Vendas</h3>
+                <div id="adminRaffleSalesList" style="max-height: 300px; overflow-y: auto; padding-right: 10px;"></div>
+            </div>
+            <div id="adminRafflePromotionsManagement" style="margin-top: 2rem;">
+                <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Gerenciar Promoções da Rifa</h3>
+                <button class="btn" id="adminNewPromotionBtn"><span>+ Nova Promoção</span></button>
+                <div id="adminRafflePromotionsList" style="margin-top: 1rem;"></div>
+            </div>
+            <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border); text-align: right;">
+                 <button class="btn btn-primary" id="adminCompleteRaffleBtn" style="display:none;">
+                    <span>Marcar como Concluída e Sortear</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="adminPromotionModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="adminPromotionModalTitle">Adicionar Promoção</h2>
+                <button class="close-modal" onclick="closeModal('adminPromotionModal')">✕</button>
+            </div>
+            <form id="adminPromotionForm" onsubmit="handleAdminPromotionSubmit(event)">
+                <input type="hidden" id="promotionRaffleId">
+                <input type="hidden" id="promotionEditId">
+                <div class="form-group">
+                    <label>Título da Promoção</label>
+                    <input type="text" class="form-input" id="promotionTitle" required placeholder="Ex: Leve 10, Pague R$X">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Promoção</label>
+                    <select class="form-input" id="promotionType" onchange="updatePromotionFields()">
+                        <option value="">Selecione o tipo</option>
+                        <option value="discount_quantity_threshold">Desconto Progressivo por Qtde.</option>
+                        <option value="fixed_price_pack">Pacote com Preço Fixo</option>
+                    </select>
+                </div>
+                <div id="promotionSpecificFields"></div>
+                <div class="form-group cyber-toggle" style="margin-top:1rem;">
+                    <div class="toggle-switch" id="promotionActiveToggle" onclick="this.classList.toggle('active')"></div>
+                    <label>Promoção Ativa</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    <span id="adminPromotionSubmitBtnText">Salvar Promoção</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

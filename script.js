@@ -1,0 +1,1442 @@
+// Variáveis Globais
+let currentUser = null;
+let currentRaffle = null; 
+let selectedQuantity = 1;
+let selectedPaymentMethod = null;
+let isAdminAuthenticated = false;
+let uploadedImageBase64 = null;
+let editingRaffleId = null; 
+let currentAdminRaffleIdForPromotion = null; 
+
+// Database (simulação com localStorage)
+let db = {
+    raffles: [],
+    sales: [],
+    users: [],
+    promotions: [] 
+};
+
+// Admin Credentials (para simulação)
+const ADMIN_CREDENTIALS = {
+    email: 'rafaelsousaooficial@gmail.com', 
+    password: 'as12345'                 
+};
+
+// Instâncias dos Gráficos
+let activeRafflesChartInstance = null;
+let salesLast7DaysChartInstance = null;
+
+
+// Inicialização da Aplicação
+function initializeApp() {
+    console.log("WebApp RifaMax: initializeApp() chamada.");
+    loadDB(); 
+    
+    const savedUser = localStorage.getItem('rifamaxCurrentUser');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        console.log("WebApp RifaMax: Usuário encontrado no localStorage:", currentUser);
+        updateAuthUI();
+    }
+    
+    renderRaffles(); 
+    showPage('home'); 
+    
+    window.addEventListener('scroll', handleScroll);
+    setupPhoneMasks();
+
+    const adminEditBtn = document.getElementById('adminEditRaffleBtnFromDetail');
+    if(adminEditBtn) {
+        adminEditBtn.onclick = () => {
+            if (currentRaffle) openEditRaffleForm(currentRaffle.id);
+        };
+    }
+    const adminNewPromoBtn = document.getElementById('adminNewPromotionBtn');
+    if(adminNewPromoBtn) {
+        adminNewPromoBtn.onclick = () => {
+            const detailModalRaffleId = currentAdminRaffleIdForPromotion; 
+            if(detailModalRaffleId) openAdminPromotionModal(null, detailModalRaffleId);
+            else if (currentRaffle) openAdminPromotionModal(null, currentRaffle.id); 
+            else alert("Não foi possível identificar a rifa para adicionar promoção. Abra os detalhes da rifa primeiro.");
+        };
+    }
+    console.log("WebApp RifaMax: initializeApp() concluída.");
+}
+
+// Gerenciamento do Banco de Dados (localStorage)
+function saveDB() {
+    localStorage.setItem('rifamaxDB', JSON.stringify(db));
+    console.log("WebApp RifaMax: Base de dados salva no localStorage.");
+}
+
+function loadDB() {
+    const savedData = localStorage.getItem('rifamaxDB');
+    if (savedData) {
+        db = JSON.parse(savedData);
+        if (!db.promotions) db.promotions = []; 
+        db.raffles.forEach(raffle => {
+            if (raffle.prizeQuotas === undefined) {
+                raffle.prizeQuotas = ''; 
+            }
+        });
+        console.log("WebApp RifaMax: Base de dados carregada do localStorage.");
+    } else {
+        db.raffles = [
+            {
+                id: 1, title: 'iPhone 15 Pro Max 256GB', price: 25.00, totalNumbers: 500, soldNumbers: [12, 45, 78, 123, 234, 345, 456],
+                description: 'iPhone 15 Pro Max 256GB Titânio Natural.\nAparelho lacrado com garantia Apple de 1 ano.', icon: '📱', image: null, 
+                isHighlight: true, drawMethod: 'Loteria Federal, concurso do próximo sábado.', createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), completedAt: null, winner: null, prizeQuotas: "10:Vale R$20,500:Surpresa VIP" 
+            },
+            {
+                id: 2, title: 'MacBook Air M3', price: 35.00, totalNumbers: 300, soldNumbers: Array.from({length: 150}, (_, i) => i + 1),
+                description: 'MacBook Air M3 com 8GB RAM e 256GB SSD.\nPerfeito para trabalho e estudos.', icon: '💻', image: null, 
+                isHighlight: false, drawMethod: 'Sorteio ao vivo no Instagram @RifaMaxOficial assim que todas as cotas forem vendidas.', createdAt: new Date().toISOString(), completedAt: null, winner: null, prizeQuotas: "1:Bônus,150:Prêmio Extra"
+            }
+        ];
+        db.users = [];
+        db.sales = [];
+        db.promotions = [];
+        saveDB();
+        console.log("WebApp RifaMax: Base de dados de exemplo criada e salva.");
+    }
+}
+
+// Efeitos de UI e Navegação
+function handleScroll() {
+    const header = document.getElementById('header');
+    if (window.scrollY > 50) header.classList.add('scrolled');
+    else header.classList.remove('scrolled');
+}
+
+function toggleMobileMenu() {
+    document.querySelector('.mobile-menu-btn').classList.toggle('active');
+    document.getElementById('mobileSidebar').classList.toggle('active');
+}
+
+function showPage(pageId) {
+    console.log(`WebApp RifaMax: showPage('${pageId}') chamada. isAdminAuthenticated: ${isAdminAuthenticated}`);
+    if (pageId === 'admin' && !isAdminAuthenticated) {
+        console.log("WebApp RifaMax: Acesso ao admin negado. Abrindo modal de login do admin.");
+        openAdminLoginModal();
+        return;
+    }
+    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+        console.log(`WebApp RifaMax: Página '${pageId}' ativada.`);
+        window.scrollTo(0, 0);
+        if (pageId === 'admin') {
+            showAdminTab('dashboard'); 
+        } else if (pageId === 'winners') {
+            renderWinners();
+        } else if (pageId === 'home') {
+            renderRaffles();
+        } else if (pageId === 'raffle-details-page' && currentRaffle) { 
+            // A renderização dos detalhes é feita por showRaffleDetailsPage
+        }
+    } else {
+        console.error(`WebApp RifaMax: Página com ID '${pageId}' não encontrada.`);
+    }
+}
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setupPhoneMasks() {
+    const phoneInputs = document.querySelectorAll('input[type="tel"]');
+    phoneInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 10) value = value.replace(/^(\d{2})(\d{0,4})(\d{0,4}).*/, '($1) $2-$3').replace(/-$/, '');
+            else if (value.length === 11) value = value.replace(/^(\d{2})(\d{0,5})(\d{0,4}).*/, '($1) $2-$3').replace(/-$/, '');
+            else value = value.substring(0,11).replace(/^(\d{2})(\d{0,5})(\d{0,4}).*/, '($1) $2-$3').replace(/-$/, '');
+            e.target.value = value;
+        });
+    });
+}
+
+function validatePhone(countryCode, phone) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (countryCode === '+55') return cleanPhone.length === 10 || cleanPhone.length === 11;
+    return cleanPhone.length >= 8;
+}
+
+// Autenticação de Usuário
+function openLoginModal() {
+    closeModal('adminLoginModal');
+    document.getElementById('loginModal').classList.add('active');
+    console.log("WebApp RifaMax: Modal de login do usuário aberto.");
+}
+
+function login(event) {
+    event.preventDefault();
+    const countryCode = document.getElementById('loginCountryCode').value;
+    const phone = document.getElementById('loginPhone').value;
+    const name = document.getElementById('loginName').value;
+
+    if (!validatePhone(countryCode, phone)) {
+        alert('Número de telefone inválido!'); return;
+    }
+    const fullPhone = countryCode + phone.replace(/\D/g, '');
+    currentUser = { phone: fullPhone, name: name, displayPhone: `${countryCode} ${phone}` };
+    localStorage.setItem('rifamaxCurrentUser', JSON.stringify(currentUser));
+    if (!db.users.find(u => u.phone === fullPhone)) {
+        db.users.push({phone: fullPhone, name: name, createdAt: new Date().toISOString()});
+        saveDB();
+    }
+    closeModal('loginModal');
+    updateAuthUI();
+    console.log("WebApp RifaMax: Login do usuário realizado:", currentUser);
+}
+
+function updateAuthUI() {
+    const authBtn = document.getElementById('authBtn');
+    const mobileAuthBtn = document.querySelector('.mobile-sidebar .btn-primary'); 
+    if (currentUser) {
+        authBtn.innerHTML = '<span>Sair</span>';
+        authBtn.onclick = logout;
+        if(mobileAuthBtn) {
+            mobileAuthBtn.innerHTML = '<span>Sair</span>';
+            mobileAuthBtn.onclick = function() { logout(); toggleMobileMenu(); };
+        }
+    } else {
+        authBtn.innerHTML = '<span>Entrar</span>';
+        authBtn.onclick = openLoginModal;
+        if(mobileAuthBtn) {
+            mobileAuthBtn.innerHTML = '<span>Entrar</span>';
+            mobileAuthBtn.onclick = function() { openLoginModal(); toggleMobileMenu(); };
+        }
+    }
+    console.log("WebApp RifaMax: UI de autenticação atualizada. Usuário atual:", currentUser);
+}
+
+function logout() {
+    currentUser = null;
+    localStorage.removeItem('rifamaxCurrentUser');
+    updateAuthUI();
+    showPage('home');
+    console.log("WebApp RifaMax: Logout do usuário realizado.");
+}
+
+// Modais
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active');
+        console.log(`WebApp RifaMax: Modal '${modalId}' fechado.`);
+    } else {
+        console.warn(`WebApp RifaMax: Tentativa de fechar modal inexistente: '${modalId}'`);
+    }
+}
+window.addEventListener('click', function(e) { 
+    if (e.target.classList.contains('modal')) {
+        closeModal(e.target.id);
+    }
+});
+
+
+// Funções do Painel de Administração
+function requestAdminAccess() {
+    console.log(`WebApp RifaMax: requestAdminAccess() chamada. isAdminAuthenticated: ${isAdminAuthenticated}`);
+    if (isAdminAuthenticated) showPage('admin');
+    else openAdminLoginModal();
+}
+
+function openAdminLoginModal() {
+    closeModal('loginModal');
+    document.getElementById('adminLoginModal').classList.add('active');
+    console.log("WebApp RifaMax: Modal de login do admin aberto.");
+}
+
+function adminLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('adminEmail').value;
+    const password = document.getElementById('adminPassword').value;
+    console.log(`WebApp RifaMax: Tentativa de login do admin com email: ${email}`);
+    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+        isAdminAuthenticated = true;
+        console.log("WebApp RifaMax: Login do admin bem-sucedido. isAdminAuthenticated:", isAdminAuthenticated);
+        closeModal('adminLoginModal');
+        showPage('admin');
+    } else {
+        alert('Credenciais de admin inválidas!');
+        isAdminAuthenticated = false;
+        console.warn("WebApp RifaMax: Tentativa de login do admin falhou.");
+    }
+}
+
+function showAdminTab(tab) {
+    console.log(`WebApp RifaMax: showAdminTab('${tab}') chamada. isAdminAuthenticated: ${isAdminAuthenticated}`);
+    if (!isAdminAuthenticated) {
+        console.warn("WebApp RifaMax: Tentativa de mostrar aba do admin sem autenticação.");
+        return;
+    }
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    const clickedTabButton = document.querySelector(`.admin-tab[onclick="showAdminTab('${tab}')"]`);
+    if (clickedTabButton) clickedTabButton.classList.add('active');
+    
+    document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+    const targetContent = document.getElementById(`admin-${tab}`);
+    if (targetContent) {
+        targetContent.classList.add('active');
+        console.log(`WebApp RifaMax: Aba do admin '${tab}' ativada.`);
+    } else {
+         console.error(`WebApp RifaMax: Conteúdo da aba do admin 'admin-${tab}' não encontrado.`);
+    }
+    
+    if (tab === 'dashboard') updateAdminDashboard();
+    else if (tab === 'raffles') updateRafflesTable();
+    else if (tab === 'sales') updateSalesTable();
+    else if (tab === 'create') { 
+        document.getElementById('createRaffleForm').reset();
+        const prizeQuotasInput = document.getElementById('rafflePrizeQuotas');
+        if(prizeQuotasInput) prizeQuotasInput.value = '';
+        uploadedImageBase64 = null;
+        document.getElementById('uploadPlaceholder').innerHTML = '<i>📸</i><p>Clique para adicionar imagem</p>';
+        document.getElementById('highlightToggle').classList.remove('active');
+        document.getElementById('adminCreateEditTitle').textContent = 'Criar Nova Rifa';
+        document.getElementById('createRaffleSubmitBtnText').textContent = 'Criar Rifa';
+        editingRaffleId = null; 
+        console.log("WebApp RifaMax: Formulário de criação de rifa resetado.");
+    }
+}
+
+// Upload de Imagem
+function previewImage(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            uploadedImageBase64 = e.target.result;
+            document.getElementById('uploadPlaceholder').innerHTML =  
+                `<img src="${uploadedImageBase64}" alt="Preview">`;
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// Criação e Edição de Rifas
+function openEditRaffleForm(raffleId) {
+    editingRaffleId = raffleId;
+    const raffle = db.raffles.find(r => r.id === raffleId);
+    if (!raffle) {
+        alert('Rifa não encontrada para edição!');
+        editingRaffleId = null;
+        return;
+    }
+    console.log("WebApp RifaMax: Abrindo formulário para editar rifa:", raffle);
+
+    document.getElementById('raffleTitle').value = raffle.title;
+    document.getElementById('rafflePrice').value = raffle.price;
+    document.getElementById('raffleTotalNumbers').value = raffle.totalNumbers;
+    document.getElementById('raffleDescription').value = raffle.description;
+    document.getElementById('raffleIcon').value = raffle.icon || '';
+    document.getElementById('raffleDrawMethod').value = raffle.drawMethod || '';
+    document.getElementById('rafflePrizeQuotas').value = raffle.prizeQuotas || '';
+    
+    uploadedImageBase64 = raffle.image; 
+    if (raffle.image) {
+        document.getElementById('uploadPlaceholder').innerHTML = 
+            `<img src="${raffle.image}" alt="Preview">`;
+    } else {
+        document.getElementById('uploadPlaceholder').innerHTML = 
+            '<i>📸</i><p>Clique para adicionar imagem</p>';
+    }
+
+    if (raffle.isHighlight) document.getElementById('highlightToggle').classList.add('active');
+    else document.getElementById('highlightToggle').classList.remove('active');
+
+    showAdminTab('create'); 
+    document.getElementById('adminCreateEditTitle').textContent = `Editando Rifa: ${raffle.title}`;
+    document.getElementById('createRaffleSubmitBtnText').textContent = 'Salvar Alterações';
+}
+
+
+function createRaffle(event) {
+    event.preventDefault();
+    console.log("WebApp RifaMax: createRaffle() iniciada. Modo Edição ID:", editingRaffleId);
+    
+    const title = document.getElementById('raffleTitle').value;
+    const price = parseFloat(document.getElementById('rafflePrice').value);
+    const totalNumbers = parseInt(document.getElementById('raffleTotalNumbers').value);
+    const description = document.getElementById('raffleDescription').value;
+    const icon = document.getElementById('raffleIcon').value || '🎁';
+    const isHighlight = document.getElementById('highlightToggle').classList.contains('active');
+    const drawMethod = document.getElementById('raffleDrawMethod').value;
+    const prizeQuotas = document.getElementById('rafflePrizeQuotas').value.trim();
+
+    if (!title || isNaN(price) || price <= 0 || isNaN(totalNumbers) || totalNumbers <= 0 || !description) {
+        alert("Por favor, preencha todos os campos obrigatórios corretamente (Título, Preço, Total de Cotas, Descrição).");
+        return;
+    }
+
+    if (isHighlight && (!editingRaffleId || (editingRaffleId && !db.raffles.find(r => r.id === editingRaffleId)?.isHighlight))) {
+        db.raffles.forEach(r => { if (r.id !== editingRaffleId) r.isHighlight = false; });
+    }
+
+    if (editingRaffleId) {
+        const raffleIndex = db.raffles.findIndex(r => r.id === editingRaffleId);
+        if (raffleIndex > -1) {
+            const existingRaffle = db.raffles[raffleIndex];
+            const approvedSoldCount = db.sales.filter(s => s.raffleId === editingRaffleId && s.status === 'approved')
+                                           .reduce((sum, s) => sum + s.numbers.length, 0);
+
+            if (totalNumbers < approvedSoldCount) {
+                 alert(`Não é possível definir o total de cotas (${totalNumbers}) como menor que o número de cotas já vendidas e aprovadas (${approvedSoldCount}).`);
+                return;
+            }
+            db.raffles[raffleIndex] = {
+                ...existingRaffle, 
+                title, price, totalNumbers, description, icon, 
+                image: uploadedImageBase64, isHighlight, drawMethod, prizeQuotas 
+            };
+            alert('Rifa atualizada com sucesso!');
+            console.log("WebApp RifaMax: Rifa atualizada:", db.raffles[raffleIndex]);
+        }
+        editingRaffleId = null; 
+        document.getElementById('adminCreateEditTitle').textContent = 'Criar Nova Rifa';
+        document.getElementById('createRaffleSubmitBtnText').textContent = 'Criar Rifa';
+
+    } else {
+        const newRaffle = {
+            id: Date.now(), title, price, totalNumbers, soldNumbers: [], description, icon,
+            image: uploadedImageBase64, isHighlight, drawMethod: drawMethod || 'A ser definido pelo organizador',
+            createdAt: new Date().toISOString(), completedAt: null, winner: null, prizeQuotas 
+        };
+        db.raffles.push(newRaffle);
+        alert('Rifa criada com sucesso!');
+        console.log("WebApp RifaMax: Nova rifa criada:", newRaffle);
+    }
+    
+    saveDB();
+    document.getElementById('createRaffleForm').reset(); 
+    uploadedImageBase64 = null; 
+    document.getElementById('uploadPlaceholder').innerHTML =  '<i>📸</i><p>Clique para adicionar imagem</p>';
+    document.getElementById('highlightToggle').classList.remove('active');
+    const prizeQuotasInput = document.getElementById('rafflePrizeQuotas');
+    if(prizeQuotasInput) prizeQuotasInput.value = '';
+    
+    renderRaffles(); 
+    updateRafflesTable();
+    showAdminTab('raffles'); 
+    if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle) {
+        // Se o modal de detalhes estava aberto para a rifa que acabou de ser editada, atualiza-o
+        if (editingRaffleId === null || (currentRaffle && currentRaffle.id === parseInt(editingRaffleId))) { 
+             openAdminRaffleDetailModal(currentRaffle.id);
+        }
+    }
+}
+
+// Renderização de Rifas (Página Pública)
+function renderRaffles() {
+    const mainRaffle = db.raffles.find(r => r.isHighlight && !r.completedAt);
+    const mainContainer = document.getElementById('mainRaffleContainer');
+    if (mainRaffle) {
+        const approvedSoldCount = db.sales.filter(s => s.raffleId === mainRaffle.id && s.status === 'approved').reduce((sum, s) => sum + s.numbers.length, 0);
+        const percentage = mainRaffle.totalNumbers > 0 ? (approvedSoldCount / mainRaffle.totalNumbers * 100).toFixed(1) : 0;
+        mainContainer.innerHTML = `
+            <div class="main-raffle-card">
+                <span class="badge">DESTAQUE</span>
+                ${mainRaffle.image ? `<img src="${mainRaffle.image}" alt="${mainRaffle.title}" style="width: 100%; height: 300px; object-fit: cover; border-radius: 20px; margin-bottom: 2rem;">` : `<div style="font-size: 6rem; text-align: center; margin: 2rem 0; color: var(--primary);">${mainRaffle.icon}</div>`}
+                <h3 style="font-size: 2rem; margin-bottom: 1rem;">${mainRaffle.title}</h3>
+                <div style="font-size: 3rem; color: var(--primary); font-weight: 900; margin-bottom: 1rem;">R$ ${mainRaffle.price.toFixed(2).replace('.', ',')}</div>
+                <div class="progress-container">
+                    <div class="progress-info"><span>Vendidos (Aprovados): ${approvedSoldCount}</span><span>${percentage}%</span><span>Total: ${mainRaffle.totalNumbers}</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: ${percentage}%"></div></div>
+                </div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 2rem;" onclick="showRaffleDetailsPage(${mainRaffle.id})"><span>Ver Detalhes</span></button>
+            </div>`;
+    } else {
+        mainContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Nenhuma rifa em destaque no momento.</p>';
+    }
+    
+    const otherRaffles = db.raffles.filter(r => (!r.isHighlight && !r.completedAt) || r.completedAt );
+    const grid = document.getElementById('campaignsGrid');
+    grid.innerHTML = otherRaffles.sort((a,b) => (a.completedAt ? 1 : -1) - (b.completedAt ? 1 : -1) || new Date(b.createdAt) - new Date(a.createdAt) )
+    .map(raffle => {
+        const approvedSoldCount = db.sales.filter(s => s.raffleId === raffle.id && s.status === 'approved').reduce((sum, s) => sum + s.numbers.length, 0);
+        const percentage = raffle.totalNumbers > 0 ? (approvedSoldCount / raffle.totalNumbers * 100).toFixed(1) : 0;
+        const isCompleted = raffle.completedAt !== null;
+        return `
+            <div class="campaign-card ${isCompleted ? 'completed' : ''}">
+                <div class="campaign-image">${raffle.image ? `<img src="${raffle.image}" alt="${raffle.title}">` : `<div class="default-icon">${raffle.icon}</div>`}</div>
+                <h3 style="font-size: 1.3rem; margin-bottom: 1rem;">${raffle.title}</h3>
+                <div style="font-size: 1.8rem; color: var(--primary); font-weight: 700; margin-bottom: 1rem;">R$ ${raffle.price.toFixed(2).replace('.', ',')}</div>
+                ${isCompleted ? `
+                    <div style="text-align: center; padding: 1rem; background: var(--glass-bg); border-radius: 10px; margin-top: 1rem;">
+                        <h4 style="color: var(--accent); margin-bottom: 0.5rem;">🏆 Ganhador</h4>
+                        <p style="color: var(--text-primary);">${raffle.winner.name}</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Cota: ${raffle.winner.number.toString().padStart(String(raffle.totalNumbers).length, '0')}</p>
+                        <button class="btn" style="width: 100%; margin-top: 1rem; border-color: var(--accent); color:var(--accent);" onclick="showRaffleDetailsPage(${raffle.id})"><span>Ver Sorteio</span></button>
+                    </div>` : `
+                    <div class="progress-container">
+                        <div class="progress-info"><span>${approvedSoldCount}/${raffle.totalNumbers} (Aprov.)</span><span>${percentage}%</span></div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: ${percentage}%"></div></div>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="showRaffleDetailsPage(${raffle.id})"><span>Ver Detalhes</span></button>
+                `}
+            </div>`;
+    }).join('');
+}
+
+// Página de Detalhes da Rifa (Pública)
+function showRaffleDetailsPage(raffleId) {
+    currentRaffle = db.raffles.find(r => r.id === raffleId);
+    if (!currentRaffle) { alert('Rifa não encontrada!'); showPage('home'); return; }
+
+    const container = document.getElementById('raffleDetailsContainer');
+    const approvedSoldCount = db.sales.filter(s => s.raffleId === currentRaffle.id && s.status === 'approved').reduce((sum, s) => sum + s.numbers.length, 0);
+    const percentage = currentRaffle.totalNumbers > 0 ? (approvedSoldCount / currentRaffle.totalNumbers * 100).toFixed(1) : 0;
+    const isCompleted = currentRaffle.completedAt !== null;
+    
+    let detailsHTML = `
+        <section class="cyber-card" style="margin-bottom: 2rem;">
+            ${currentRaffle.image ? `<img src="${currentRaffle.image}" alt="${currentRaffle.title}" style="width: 100%; max-height: 450px; object-fit: cover; border-radius: 15px; margin-bottom: 1.5rem;">` : `<div style="font-size: 8rem; text-align: center; margin: 2rem 0; color: var(--primary);">${currentRaffle.icon}</div>`}
+            <h2 style="font-size: 2.2rem; color: var(--primary); margin-bottom: 1rem; text-align:center;">${currentRaffle.title}</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.7; text-align:justify;">${currentRaffle.description.replace(/\n/g, '<br>')}</p>
+            ${currentRaffle.drawMethod ? `<p style="color: var(--text-muted); font-style: italic; margin-bottom: 1.5rem; background: var(--bg-tertiary); padding: 0.8rem; border-radius: 8px;"><strong>Sorteio por:</strong> ${currentRaffle.drawMethod}</p>` : ''}
+            <div style="font-size: 1.8rem; color: var(--primary); font-weight: 700; margin: 1.5rem 0; text-align:center;">R$ ${currentRaffle.price.toFixed(2).replace('.', ',')} por cota</div>`;
+    if (isCompleted) {
+        detailsHTML += `
+            <div style="text-align: center; padding: 2rem; background: var(--glass-bg); border-radius: 10px; border: 1px solid var(--accent);">
+                <h3 style="color: var(--accent); margin-bottom: 1rem; font-size: 1.8rem;">🎉 RIFA FINALIZADA 🎉</h3>
+                <p style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 0.5rem;"><strong>Ganhador:</strong> ${currentRaffle.winner.name}</p>
+                <p style="color: var(--text-secondary); font-size: 1.1rem;"><strong>Cota Sorteada:</strong> <span class="ticket-number">${currentRaffle.winner.number.toString().padStart(String(currentRaffle.totalNumbers).length, '0')}</span></p>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top:1rem;">Sorteio realizado em: ${new Date(currentRaffle.completedAt).toLocaleDateString('pt-BR')}</p>
+            </div>`;
+    } else {
+        detailsHTML += `
+            <div class="progress-container" style="margin-bottom: 2rem;">
+                <div class="progress-info"><span>Vendidos (Aprovados): ${approvedSoldCount}</span><span>${percentage}%</span><span>Total: ${currentRaffle.totalNumbers}</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width: ${percentage}%"></div></div>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; font-size: 1.2rem; padding: 1rem;" onclick="openPurchaseModal(${currentRaffle.id})"><span>🛒 Comprar Cotas</span></button>`;
+    }
+    detailsHTML += `</section>`;
+    
+    detailsHTML += `
+        <section class="cyber-card ranking-container" style="margin-top: 2rem; margin-bottom: 2rem;">
+            <h3>🏆 Ranking de Compradores</h3>
+            <div id="rankingDetailsContainer">${renderRaffleRanking(currentRaffle.id)}</div>
+        </section>
+        <section class="cyber-card prize-quotas-container">
+            <h3>🏅 Cotas Premiadas</h3>
+            <div id="prizeQuotasDetailsContainer">${renderPrizeQuotas(currentRaffle.id)}</div>
+        </section>`;
+    
+    container.innerHTML = detailsHTML;
+    showPage('raffle-details-page');
+}
+
+// Funções de Compra
+function openPurchaseModal(raffleId) {
+    if (!currentUser) { alert('Você precisa fazer login primeiro!'); openLoginModal(); return; }
+    currentRaffle = db.raffles.find(r => r.id === raffleId); 
+    if (!currentRaffle || currentRaffle.completedAt) { alert('Esta rifa não está disponível ou já foi finalizada.'); return; }
+    
+    document.getElementById('purchaseTitle').textContent = `Comprar Cotas: ${currentRaffle.title}`;
+    let descriptionHtml = currentRaffle.description.replace(/\n/g, '<br>');
+    if (currentRaffle.drawMethod) {
+        descriptionHtml += `<br><br><p style="margin-top:10px; padding:10px; background-color:var(--bg-tertiary); border-left: 3px solid var(--primary-dark); border-radius:4px;"><strong>Sorteio por:</strong> ${currentRaffle.drawMethod}</p>`;
+    }
+    document.getElementById('raffleDescriptionModal').innerHTML = descriptionHtml;
+    selectedQuantity = 1;
+    updatePurchaseDisplay(); 
+    document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('selected'));
+    document.getElementById('paymentDetails').innerHTML = '';
+    selectedPaymentMethod = null;
+    document.getElementById('purchaseModal').classList.add('active');
+}
+
+function setQuantity(qty) {
+    if (!currentRaffle || currentRaffle.completedAt) return;
+    selectedQuantity = qty;
+    updatePurchaseDisplay();
+}
+function increaseQuantity() {
+    if (!currentRaffle || currentRaffle.completedAt) return;
+    selectedQuantity++;
+    updatePurchaseDisplay();
+}
+function decreaseQuantity() {
+    if (!currentRaffle || currentRaffle.completedAt) return;
+    if (selectedQuantity > 1) { selectedQuantity--; updatePurchaseDisplay(); }
+}
+
+function updatePurchaseDisplay() {
+    if (!currentRaffle) return;
+    document.getElementById('quantityDisplay').textContent = selectedQuantity;
+    let finalPricePerTicket = currentRaffle.price;
+    let promotionAppliedTitle = null;
+    const activePromos = db.promotions.filter(p => p.raffleId === currentRaffle.id && p.isActive);
+    
+    let bestPromoPrice = currentRaffle.price;
+
+    for (const promo of activePromos) { 
+        let currentPromoPricePerTicket = currentRaffle.price;
+        if (promo.type === 'discount_quantity_threshold' && selectedQuantity >= promo.details.minQuantity) {
+            currentPromoPricePerTicket = promo.details.discountedPrice;
+        } else if (promo.type === 'fixed_price_pack' && selectedQuantity > 0 && selectedQuantity % promo.details.packQuantity === 0) {
+            const numberOfPacks = selectedQuantity / promo.details.packQuantity;
+            currentPromoPricePerTicket = (numberOfPacks * promo.details.packPrice) / selectedQuantity;
+        }
+
+        if (currentPromoPricePerTicket < bestPromoPrice) {
+            bestPromoPrice = currentPromoPricePerTicket;
+            promotionAppliedTitle = promo.title;
+        }
+    }
+    finalPricePerTicket = bestPromoPrice;
+
+    const total = selectedQuantity * finalPricePerTicket;
+    document.getElementById('totalPrice').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    const promoInfoDiv = document.getElementById('purchasePromoInfo');
+    if (promoInfoDiv) {
+        if (promotionAppliedTitle) {
+            promoInfoDiv.innerHTML = `<p style="color: var(--success); text-align: center; margin-bottom: 1rem;">🎉 Promoção aplicada: ${promotionAppliedTitle}! (R$ ${finalPricePerTicket.toFixed(2).replace('.',',')} por cota)</p>`;
+            promoInfoDiv.style.display = 'block';
+        } else {
+            promoInfoDiv.innerHTML = '';
+            promoInfoDiv.style.display = 'none';
+        }
+    }
+}
+
+
+function selectPayment(method) {
+    selectedPaymentMethod = method;
+    document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('selected'));
+    let targetElement = event.target;
+    while(targetElement && !targetElement.classList.contains('payment-method')) {
+        targetElement = targetElement.parentElement;
+    }
+    if (targetElement) targetElement.classList.add('selected');
+    const detailsDiv = document.getElementById('paymentDetails');
+    if (method === 'pix') {
+        detailsDiv.innerHTML = `
+            <div class="pix-container">
+                <h3 style="color: var(--primary); margin-bottom: 1rem;">Pagamento via PIX</h3>
+                <p style="color:var(--text-secondary); margin-bottom:1rem;">Use o QR Code ou copie o código abaixo.</p>
+                <div class="pix-qr" id="pixQR"></div>
+                <div class="pix-code" id="pixCode" style="margin-top:1rem; margin-bottom:1rem; padding:1rem; background: var(--bg-primary); border-radius:8px; user-select:all; cursor:copy;" onclick="copyPixCode()">Gerando código...</div>
+                <button class="btn" onclick="copyPixCode()"><span>Copiar Código</span></button>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="simulatePayment()"><span>Já Paguei (Simular)</span></button>
+            </div>`;
+        generatePixCode();
+    } else if (method === 'card') {
+        detailsDiv.innerHTML = `
+            <form onsubmit="processCardPayment(event)" style="margin-top:1.5rem;">
+                <div class="form-group"><label>Número do Cartão</label><input type="text" class="form-input" id="cardNumber" placeholder="0000 0000 0000 0000" maxlength="19" required></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group"><label>Validade</label><input type="text" class="form-input" id="cardExpiry" placeholder="MM/AA" maxlength="5" required></div>
+                    <div class="form-group"><label>CVV</label><input type="text" class="form-input" id="cardCVV" placeholder="000" maxlength="3" pattern="\\d{3}" required></div>
+                </div>
+                <div class="form-group"><label>Nome no Cartão</label><input type="text" class="form-input" id="cardName" placeholder="NOME COMO NO CARTÃO" required></div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;"><span>Finalizar Pagamento (Simular)</span></button>
+            </form>`;
+        setupCardInputs();
+    }
+}
+
+function generatePixCode() {
+    if (!currentRaffle) return;
+    let finalPricePerTicket = currentRaffle.price;
+    const activePromos = db.promotions.filter(p => p.raffleId === currentRaffle.id && p.isActive);
+    let bestPromoPrice = currentRaffle.price;
+    for (const promo of activePromos) {
+        let currentPromoPricePerTicket = currentRaffle.price;
+        if (promo.type === 'discount_quantity_threshold' && selectedQuantity >= promo.details.minQuantity) {
+            currentPromoPricePerTicket = promo.details.discountedPrice;
+        } else if (promo.type === 'fixed_price_pack' && selectedQuantity > 0 && selectedQuantity % promo.details.packQuantity === 0) {
+            const numberOfPacks = selectedQuantity / promo.details.packQuantity;
+            currentPromoPricePerTicket = (numberOfPacks * promo.details.packPrice) / selectedQuantity;
+        }
+        if (currentPromoPricePerTicket < bestPromoPrice) bestPromoPrice = currentPromoPricePerTicket;
+    }
+    finalPricePerTicket = bestPromoPrice;
+    const total = selectedQuantity * finalPricePerTicket;
+
+    const pixKey = "chave-pix-aleatoria-do-vendedor"; 
+    const merchantName = "RifaMax"; 
+    const merchantCity = "CIDADE"; 
+    const txid = "TXID" + Date.now();
+    const pixString = `PIX:${pixKey}?value=${total.toFixed(2)}&name=${encodeURIComponent(merchantName)}&city=${encodeURIComponent(merchantCity)}&txid=${txid}`;
+    const pixCodeDisplay = document.getElementById('pixCode');
+    if(pixCodeDisplay) pixCodeDisplay.textContent = pixString.substring(0,100) + "... (código completo no QR)";
+    const qrDiv = document.getElementById('pixQR');
+    if (qrDiv) {
+        qrDiv.innerHTML = ''; 
+        try {
+            new QRCode(qrDiv, { text: pixString, width: 200, height: 200, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+        } catch(e) { console.error("Erro ao gerar QRCode: ", e); qrDiv.innerHTML = "Erro ao gerar QR Code."; }
+    }
+}
+
+function copyPixCode() {
+    let finalPricePerTicket = currentRaffle.price;
+    const activePromos = db.promotions.filter(p => p.raffleId === currentRaffle.id && p.isActive);
+    let bestPromoPrice = currentRaffle.price;
+    for (const promo of activePromos) {
+        let currentPromoPricePerTicket = currentRaffle.price;
+        if (promo.type === 'discount_quantity_threshold' && selectedQuantity >= promo.details.minQuantity) {
+            currentPromoPricePerTicket = promo.details.discountedPrice;
+        } else if (promo.type === 'fixed_price_pack' && selectedQuantity > 0 && selectedQuantity % promo.details.packQuantity === 0) {
+            const numberOfPacks = selectedQuantity / promo.details.packQuantity;
+            currentPromoPricePerTicket = (numberOfPacks * promo.details.packPrice) / selectedQuantity;
+        }
+        if (currentPromoPricePerTicket < bestPromoPrice) bestPromoPrice = currentPromoPricePerTicket;
+    }
+    finalPricePerTicket = bestPromoPrice;
+    const total = selectedQuantity * finalPricePerTicket;
+
+    const pixKey = "chave-pix-aleatoria-do-vendedor"; const merchantName = "RifaMax"; const merchantCity = "CIDADE"; const txid = "TXID" + Date.now();
+    const pixString = `PIX:${pixKey}?value=${total.toFixed(2)}&name=${encodeURIComponent(merchantName)}&city=${encodeURIComponent(merchantCity)}&txid=${txid}`;
+    navigator.clipboard.writeText(pixString).then(() => alert('Informação para PIX copiada!')).catch(err => alert('Erro ao copiar.'));
+}
+
+function setupCardInputs() {
+    const cardNumber = document.getElementById('cardNumber');
+    const cardExpiry = document.getElementById('cardExpiry');
+    if (cardNumber) cardNumber.addEventListener('input', function(e) { e.target.value = (e.target.value.replace(/\D/g, '').match(/.{1,4}/g)?.join(' ') || e.target.value.replace(/\D/g, '')).substring(0, 19); });
+    if (cardExpiry) cardExpiry.addEventListener('input', function(e) { let v = e.target.value.replace(/\D/g, ''); if (v.length >= 2) v = v.substring(0, 2) + '/' + v.substring(2, 4); e.target.value = v.substring(0,5); });
+}
+
+function simulatePayment() { 
+    if(!currentRaffle || !currentUser || !selectedPaymentMethod) { alert("Erro: Informações ausentes."); return; }
+    processPayment(selectedPaymentMethod);
+}
+function processCardPayment(event) { 
+    event.preventDefault();
+    if(!currentRaffle || !currentUser || !selectedPaymentMethod) { alert("Erro: Informações ausentes."); return; }
+    processPayment(selectedPaymentMethod);
+}
+
+function processPayment(method) {
+    if (!currentRaffle || !currentUser) { alert("Erro interno."); return; }
+    
+    let finalPricePerTicket = currentRaffle.price;
+    const activePromos = db.promotions.filter(p => p.raffleId === currentRaffle.id && p.isActive);
+    let bestPromoPrice = currentRaffle.price;
+    for (const promo of activePromos) {
+        let currentPromoPricePerTicket = currentRaffle.price;
+        if (promo.type === 'discount_quantity_threshold' && selectedQuantity >= promo.details.minQuantity) {
+            currentPromoPricePerTicket = promo.details.discountedPrice;
+        } else if (promo.type === 'fixed_price_pack' && selectedQuantity > 0 && selectedQuantity % promo.details.packQuantity === 0) {
+            const numberOfPacks = selectedQuantity / promo.details.packQuantity;
+            currentPromoPricePerTicket = (numberOfPacks * promo.details.packPrice) / selectedQuantity;
+        }
+        if (currentPromoPricePerTicket < bestPromoPrice) bestPromoPrice = currentPromoPricePerTicket;
+    }
+    finalPricePerTicket = bestPromoPrice;
+    const totalAmount = selectedQuantity * finalPricePerTicket;
+
+
+    const availableNumbers = Array.from({length: currentRaffle.totalNumbers}, (_, i) => i + 1).filter(n => !currentRaffle.soldNumbers.includes(n));
+    if (availableNumbers.length < selectedQuantity) { alert('Não há cotas suficientes disponíveis.'); return; }
+    const purchasedNumbers = [];
+    for (let i = 0; i < selectedQuantity && availableNumbers.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+        purchasedNumbers.push(availableNumbers.splice(randomIndex, 1)[0]);
+    }
+    const sale = {
+        id: Date.now(), raffleId: currentRaffle.id, userId: currentUser.phone, userName: currentUser.name,
+        numbers: purchasedNumbers, amount: totalAmount, 
+        paymentMethod: method, date: new Date().toISOString(), status: 'pending_admin_approval'
+    };
+    db.sales.push(sale);
+    saveDB();
+    closeModal('purchaseModal');
+    showSuccess(purchasedNumbers); 
+}
+
+
+function completeRaffle(raffle, manualWinnerNumber = null, forceFinalizeNoWinner = false) { 
+    if (raffle.completedAt) { alert("Esta rifa já foi finalizada."); return; }
+    
+    if (forceFinalizeNoWinner) {
+        raffle.completedAt = new Date().toISOString();
+        raffle.winner = { name: "N/A (Finalizada sem vendas)", number: "N/A", phone: "N/A" };
+        saveDB();
+        alert(`Rifa "${raffle.title}" finalizada sem ganhador.`);
+        renderRaffles();
+        updateRafflesTable();
+        if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle && currentRaffle.id === raffle.id) {
+            openAdminRaffleDetailModal(raffle.id);
+        }
+        return;
+    }
+    
+    const approvedSalesForRaffle = db.sales.filter(s => s.raffleId === raffle.id && s.status === 'approved');
+    
+    let winnerNumber;
+    let winnerSale = null;
+
+    if (manualWinnerNumber !== null) {
+        winnerNumber = parseInt(manualWinnerNumber);
+        if (isNaN(winnerNumber) || winnerNumber <= 0 || winnerNumber > raffle.totalNumbers) {
+            alert("Número da cota ganhadora inválido.");
+            return;
+        }
+        for(const sale of approvedSalesForRaffle) {
+            if(sale.numbers.includes(winnerNumber)) {
+                winnerSale = sale;
+                break;
+            }
+        }
+        if (!winnerSale) {
+            alert(`A cota ${winnerNumber} não foi encontrada entre as vendas aprovadas ou não foi vendida.`);
+            return;
+        }
+    } else { 
+        const allApprovedSoldNumbers = [];
+        approvedSalesForRaffle.forEach(sale => allApprovedSoldNumbers.push(...sale.numbers));
+        if (allApprovedSoldNumbers.length === 0) {
+             alert("Nenhuma cota aprovada para sortear automaticamente. Se deseja finalizar, defina um ganhador manualmente ou aprove vendas.");
+             return;
+        }
+        const winnerNumberIndex = Math.floor(Math.random() * allApprovedSoldNumbers.length);
+        winnerNumber = allApprovedSoldNumbers[winnerNumberIndex];
+        for(const sale of approvedSalesForRaffle) { 
+            if(sale.numbers.includes(winnerNumber)) { winnerSale = sale; break; }
+        }
+    }
+    
+    if (!winnerSale && manualWinnerNumber === null) { 
+        alert("Erro crítico: Não foi possível determinar os dados do ganhador no sorteio automático."); 
+        return;
+    }
+    
+    raffle.completedAt = new Date().toISOString();
+    raffle.winner = { 
+        number: winnerNumber, 
+        name: winnerSale ? winnerSale.userName : "Ganhador Manual (Dados não encontrados na venda)", 
+        phone: winnerSale ? winnerSale.userId : "N/A"
+    };
+    saveDB();
+    alert(`Rifa "${raffle.title}" finalizada! Ganhador: ${raffle.winner.name}, Cota: ${raffle.winner.number}`);
+    renderRaffles();
+    updateRafflesTable();
+    if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle && currentRaffle.id === raffle.id) {
+        openAdminRaffleDetailModal(raffle.id); 
+    }
+}
+
+function showSuccess(numbers) {
+    closeModal('purchaseModal');
+    const numbersHtml = numbers.map(n => `<span class="ticket-number">${n.toString().padStart(String(currentRaffle?.totalNumbers || 0).length, '0')}</span>`).join('');
+    document.getElementById('successNumbers').innerHTML = numbersHtml;
+    document.getElementById('successModal').classList.add('active');
+}
+
+// Minhas Cotas
+function searchTickets() {
+    const countryCode = document.getElementById('countryCode').value;
+    const phone = document.getElementById('phoneSearch').value;
+    if (!validatePhone(countryCode, phone)) { alert('Número de telefone inválido!'); return; }
+    const fullPhone = countryCode + phone.replace(/\D/g, '');
+    const userSales = db.sales.filter(s => s.userId === fullPhone && s.status === 'approved'); 
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.style.display = 'block';
+    if (userSales.length === 0) {
+        resultsDiv.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Nenhuma cota (aprovada) encontrada.</p>';
+        return;
+    }
+    resultsDiv.innerHTML = userSales.map(sale => {
+        const raffle = db.raffles.find(r => r.id === sale.raffleId);
+        if (!raffle) return '';
+        return `
+            <div class="ticket-card">
+                <div>
+                    <h4 style="color: var(--primary); margin-bottom: 0.5rem;">${raffle.title}</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Comprado em: ${new Date(sale.date).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div class="ticket-numbers">${sale.numbers.map(n => `<span class="ticket-number">${n.toString().padStart(String(raffle.totalNumbers).length, '0')}</span>`).join('')}</div>
+            </div>`;
+    }).join('');
+}
+
+// Funções do Dashboard Admin
+function updateAdminDashboard() {
+    console.log("WebApp RifaMax: updateAdminDashboard() chamada.");
+    let totalRevenue = 0; let totalTicketsSold = 0; const activeUsers = new Set(); let activeRafflesCount = 0;
+    db.sales.forEach(sale => {
+        if (sale.status === 'approved') {
+            totalRevenue += sale.amount;
+            totalTicketsSold += sale.numbers.length;
+            activeUsers.add(sale.userId);
+        }
+    });
+    db.raffles.forEach(raffle => { if (!raffle.completedAt) activeRafflesCount++; });
+    
+    document.getElementById('totalRevenue').textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
+    document.getElementById('totalTickets').textContent = totalTicketsSold.toLocaleString();
+    document.getElementById('activeUsers').textContent = activeUsers.size;
+    document.getElementById('activeRaffles').textContent = activeRafflesCount;
+
+    populateDashboardRaffleSelect();
+    renderActiveRafflesProgressChart();
+    renderSalesLast7DaysChart();
+}
+
+function populateDashboardRaffleSelect() {
+    const selectElement = document.getElementById('dashboardRaffleSelect');
+    if (!selectElement) return;
+    selectElement.innerHTML = '<option value="">-- Escolha uma rifa --</option>';
+    db.raffles.forEach(raffle => {
+        const option = document.createElement('option');
+        option.value = raffle.id;
+        option.textContent = `${raffle.icon || ''} ${raffle.title} (${raffle.completedAt ? 'Finalizada' : 'Ativa'})`;
+        selectElement.appendChild(option);
+    });
+}
+
+function handleDashboardRaffleSelectChange(selectElement) {
+    const raffleId = parseInt(selectElement.value);
+    const quickStatsDiv = document.getElementById('dashboardRaffleQuickStats');
+    quickStatsDiv.innerHTML = '';
+    if (raffleId) {
+        const selectedRaffle = db.raffles.find(r => r.id === raffleId);
+        if (selectedRaffle) {
+            const approvedSoldCount = db.sales.filter(s => s.raffleId === selectedRaffle.id && s.status === 'approved').reduce((sum, s) => sum + s.numbers.length, 0);
+            const percentage = selectedRaffle.totalNumbers > 0 ? (approvedSoldCount / selectedRaffle.totalNumbers * 100).toFixed(1) : 0;
+            quickStatsDiv.innerHTML = `
+                <p style="color:var(--text-secondary); font-size:0.9rem;"><strong>${selectedRaffle.title}</strong>: ${approvedSoldCount} / ${selectedRaffle.totalNumbers} cotas aprovadas (${percentage}%).</p>
+                <button class="btn btn-primary" style="margin-top:1rem;" onclick="openAdminRaffleDetailModal(${raffleId})"><span>Ver Detalhes Completos & Vendas</span></button>`;
+        }
+    }
+}
+
+// Tabelas do Admin
+function updateRafflesTable() {
+    const tbody = document.getElementById('rafflesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = db.raffles.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(raffle => {
+        const approvedSoldCount = db.sales.filter(s => s.raffleId === raffle.id && s.status === 'approved').reduce((sum, s) => sum + s.numbers.length, 0);
+        const percentage = raffle.totalNumbers > 0 ? (approvedSoldCount / raffle.totalNumbers * 100).toFixed(1) : 0;
+        const status = raffle.completedAt ? 'completed' : 'active';
+        const statusText = raffle.completedAt ? `Finalizada (${new Date(raffle.completedAt).toLocaleDateString('pt-BR')})` : `Ativa (${percentage}% aprov.)`;
+        return `
+            <tr>
+                <td>${raffle.id}</td>
+                <td>${raffle.icon} ${raffle.title}</td>
+                <td>R$ ${raffle.price.toFixed(2).replace('.', ',')}</td>
+                <td>${approvedSoldCount}</td>
+                <td>${raffle.totalNumbers}</td>
+                <td><span class="status-badge status-${status}">${statusText}</span></td>
+                <td>
+                    <button class="action-btn" onclick="openAdminRaffleDetailModal(${raffle.id})">Detalhes</button>
+                    <button class="action-btn" style="border-color:var(--warning); color:var(--warning);" onclick="openEditRaffleForm(${raffle.id})">Editar</button>
+                    ${!raffle.completedAt ? `<button class="action-btn" style="border-color:var(--success); color:var(--success);" onclick="adminCompleteRafflePrompt(${raffle.id})">Finalizar</button>` : ''}
+                    <button class="action-btn" style="border-color:var(--danger); color:var(--danger);" onclick="deleteRaffle(${raffle.id})">Excluir</button>
+                </td>
+            </tr>`;
+    }).join('');
+}
+
+function adminCompleteRafflePrompt(raffleId) {
+    const raffle = db.raffles.find(r => r.id === raffleId);
+    if (!raffle) return;
+    
+    const approvedSalesForRaffle = db.sales.filter(s => s.raffleId === raffle.id && s.status === 'approved');
+    if (approvedSalesForRaffle.length === 0) {
+        if (!confirm(`Atenção: Nenhuma cota aprovada foi vendida para esta rifa. Deseja mesmo assim marcar como finalizada (sem ganhador)?`)) {
+            return;
+        }
+        completeRaffle(raffle, null, true); // true indica finalização forçada sem ganhador
+        return;
+    }
+
+    const choice = prompt(`Finalizar Rifa "${raffle.title}":\n1. Sortear ganhador automaticamente\n2. Definir ganhador manualmente\nDigite 1 ou 2 (ou cancele):`);
+    if (choice === '1') {
+        completeRaffle(raffle); // Sorteio automático
+    } else if (choice === '2') {
+        const winnerNumberInput = prompt(`Digite o número da cota ganhadora para a rifa "${raffle.title}":`);
+        if (winnerNumberInput !== null && winnerNumberInput.trim() !== "") {
+            const manualWinnerNumber = parseInt(winnerNumberInput.trim());
+            if (!isNaN(manualWinnerNumber) && manualWinnerNumber > 0) {
+                completeRaffle(raffle, manualWinnerNumber);
+            } else {
+                alert("Número da cota inválido. A finalização foi cancelada.");
+            }
+        } else if (winnerNumberInput !== null) { 
+             alert("Nenhum número de cota inserido. Finalização cancelada.");
+        } else { 
+            alert("Finalização cancelada.");
+        }
+    } else if (choice !== null) { 
+        alert("Opção inválida. Finalização cancelada.");
+    }
+}
+
+
+function deleteRaffle(raffleId) {
+    if (confirm(`Tem certeza que deseja excluir a rifa ID ${raffleId}? Esta ação não pode ser desfeita e também removerá as vendas e promoções associadas.`)) {
+        db.raffles = db.raffles.filter(r => r.id !== raffleId);
+        db.sales = db.sales.filter(s => s.raffleId !== raffleId);
+        db.promotions = db.promotions.filter(p => p.raffleId !== raffleId);
+        saveDB();
+        renderRaffles();
+        updateRafflesTable();
+        updateAdminDashboard(); 
+        alert('Rifa excluída com sucesso.');
+    }
+}
+
+function updateSalesTable() { 
+    const tbody = document.getElementById('salesTableBody');
+    if(!tbody) return;
+    const salesToDisplay = db.sales.slice().reverse();
+    tbody.innerHTML = salesToDisplay.map(sale => {
+        const raffle = db.raffles.find(r => r.id === sale.raffleId);
+        let statusClass = 'pending'; let statusText = 'Pendente';
+        if (sale.status === 'approved') { statusClass = 'active'; statusText = 'Aprovado'; }
+        else if (sale.status === 'rejected') { statusClass = 'danger'; statusText = 'Rejeitado'; }
+        return `
+            <tr>
+                <td>${new Date(sale.date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</td>
+                <td>${sale.userName}<br><small>${sale.userId}</small></td>
+                <td>${raffle ? raffle.title : 'Rifa Deletada'}</td>
+                <td>${sale.numbers.length} (${sale.numbers.map(n => n.toString().padStart(String(raffle?.totalNumbers || 0).length, '0')).join(', ')})</td>
+                <td>R$ ${sale.amount.toFixed(2).replace('.', ',')}</td>
+                <td><span class="status-badge status-${statusClass}" style="cursor:pointer;" onclick="promptChangeSaleStatus(${sale.id}, '${sale.status}')">${statusText}</span></td>
+            </tr>`;
+    }).join('');
+}
+
+function promptChangeSaleStatus(saleId, currentStatus) { 
+    const sale = db.sales.find(s => s.id === saleId);
+    if (!sale) return;
+    const raffle = db.raffles.find(r => r.id === sale.raffleId);
+    if (!raffle) { alert("Rifa associada não encontrada!"); return; }
+
+    if (currentStatus === 'pending_admin_approval') {
+        if (confirm(`Aprovar venda para "${sale.userName}" (Rifa: ${raffle.title})?`)) approveSale(saleId, sale.raffleId);
+        else if (confirm(`REJEITAR venda para "${sale.userName}" (Rifa: ${raffle.title})?`)) rejectSale(saleId, sale.raffleId);
+    } else if (currentStatus === 'rejected') {
+        if (confirm(`RE-APROVAR a venda para "${sale.userName}" (Rifa: ${raffle.title})?`)) approveSale(saleId, sale.raffleId);
+    } else if (currentStatus === 'approved') {
+         if (confirm(`Esta venda já está APROVADA. Deseja REJEITÁ-LA para "${sale.userName}" (Rifa: ${raffle.title})? Cotas serão devolvidas.`)) rejectSale(saleId, sale.raffleId);
+    }
+}
+
+
+// Modal de Detalhes da Rifa no Admin
+function openAdminRaffleDetailModal(raffleId) {
+    currentRaffle = db.raffles.find(r => r.id === raffleId); 
+    if (!currentRaffle) { alert('Rifa não encontrada!'); return; }
+    currentAdminRaffleIdForPromotion = raffleId; 
+    console.log("WebApp RifaMax: Abrindo modal de detalhes do admin para rifa:", currentRaffle);
+
+    document.getElementById('adminRaffleDetailTitle').textContent = `Detalhes: ${currentRaffle.icon || ''} ${currentRaffle.title}`;
+    const contentDiv = document.getElementById('adminRaffleDetailContent');
+    const approvedSoldCount = db.sales.filter(s => s.raffleId === currentRaffle.id && s.status === 'approved').reduce((sum, s) => sum + s.numbers.length, 0);
+    const percentage = currentRaffle.totalNumbers > 0 ? (approvedSoldCount / currentRaffle.totalNumbers * 100).toFixed(1) : 0;
+    const isCompleted = currentRaffle.completedAt !== null;
+    const approvedRevenue = calculateApprovedRevenueForRaffle(currentRaffle.id);
+
+    contentDiv.innerHTML = `
+        <div class="detail-card" style="grid-column: 1 / -1;">
+            ${currentRaffle.image ? `<img src="${currentRaffle.image}" alt="${currentRaffle.title}">` : ''}
+            <h4>Informações Principais</h4>
+            <p><strong>ID:</strong> ${currentRaffle.id}</p>
+            <p><strong>Preço por Cota:</strong> R$ ${currentRaffle.price.toFixed(2).replace('.', ',')}</p>
+            <p><strong>Total de Cotas:</strong> ${currentRaffle.totalNumbers}</p>
+            <p><strong>Cotas Vendidas (Aprovadas):</strong> ${approvedSoldCount} (${percentage}% do total)</p>
+            <p><strong>Receita (Aprovada):</strong> R$ ${approvedRevenue.toFixed(2).replace('.', ',')}</p>
+            <p><strong>Descrição:</strong> ${currentRaffle.description.replace(/\n/g, '<br>')}</p>
+            <p><strong>Método de Sorteio:</strong> ${currentRaffle.drawMethod || 'N/A'}</p>
+            <p><strong>Cotas Premiadas (definidas):</strong> ${currentRaffle.prizeQuotas || 'Nenhuma'}</p>
+            <p><strong>Criada em:</strong> ${new Date(currentRaffle.createdAt).toLocaleString('pt-BR')}</p>
+            <p><strong>Status:</strong> ${isCompleted ? `Finalizada em ${new Date(currentRaffle.completedAt).toLocaleString('pt-BR')}` : (approvedSoldCount >= currentRaffle.totalNumbers ? 'Pronta para finalizar' : 'Ativa')}</p>
+            ${isCompleted && currentRaffle.winner ? `<p><strong>Ganhador:</strong> ${currentRaffle.winner.name} (Cota: ${currentRaffle.winner.number.toString().padStart(String(currentRaffle.totalNumbers).length, '0')})</p>` : ''}
+        </div>
+        <div class="detail-card ranking-container" style="grid-column: 1 / -1;">
+            <h3>🏆 Ranking de Compradores</h3>
+            ${renderRaffleRanking(raffleId)}
+        </div>
+        <div class="detail-card prize-quotas-container" style="grid-column: 1 / -1;">
+            <h3>🏅 Cotas Premiadas</h3>
+            ${renderPrizeQuotas(raffleId)}
+        </div>`;
+        
+    renderAdminRaffleSalesList(raffleId); 
+    renderAdminRafflePromotionsList(raffleId); 
+
+    const completeBtn = document.getElementById('adminCompleteRaffleBtn');
+    const approvedSalesForRaffle = db.sales.filter(s => s.raffleId === currentRaffle.id && s.status === 'approved');
+    if (!isCompleted && approvedSalesForRaffle.length > 0) { 
+        completeBtn.style.display = 'inline-block';
+        completeBtn.innerHTML = '<span>Marcar como Concluída e Sortear</span>';
+        completeBtn.onclick = () => adminCompleteRafflePrompt(currentRaffle.id);
+    } else if (!isCompleted && approvedSalesForRaffle.length === 0) { 
+        completeBtn.style.display = 'inline-block';
+        completeBtn.innerHTML = '<span>Finalizar (Sem Vendas Aprov.)</span>'; 
+        completeBtn.onclick = () => adminCompleteRafflePrompt(currentRaffle.id);
+    }
+    else {
+        completeBtn.style.display = 'none';
+    }
+    document.getElementById('adminRaffleDetailModal').classList.add('active');
+}
+
+function calculateApprovedRevenueForRaffle(raffleId) {
+    return db.sales.filter(sale => sale.raffleId === raffleId && sale.status === 'approved').reduce((sum, sale) => sum + sale.amount, 0);
+}
+
+function renderAdminRaffleSalesList(raffleId) {
+    const salesListDiv = document.getElementById('adminRaffleSalesList');
+    const salesForRaffle = db.sales.filter(s => s.raffleId === raffleId).sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (salesForRaffle.length === 0) {
+        salesListDiv.innerHTML = '<p style="text-align:center; color:var(--text-secondary);">Nenhuma venda para esta rifa.</p>'; return;
+    }
+    salesListDiv.innerHTML = salesForRaffle.map(sale => {
+        let statusClass = 'pending'; let statusText = 'Pendente';
+        if (sale.status === 'approved') { statusClass = 'active'; statusText = 'Aprovado'; }
+        else if (sale.status === 'rejected') { statusClass = 'danger'; statusText = 'Rejeitado'; }
+        return `
+            <div class="sale-item-admin">
+                <div class="info">
+                    <p><strong>Cliente:</strong> ${sale.userName} (${sale.userId})</p>
+                    <p><strong>Data:</strong> ${new Date(sale.date).toLocaleString('pt-BR')}</p>
+                    <p><strong>Valor:</strong> R$ ${sale.amount.toFixed(2).replace('.', ',')} (${sale.numbers.length} cotas)</p>
+                    <p><strong>Método Pag.:</strong> ${sale.paymentMethod || 'N/A'}</p>
+                    <p><strong>Status:</strong> <span class="status-badge status-${statusClass}">${statusText}</span></p>
+                    <div class="ticket-numbers-admin"><strong>Cotas:</strong> ${sale.numbers.map(n => `<span class="ticket-number-admin">${n.toString().padStart(String(currentRaffle?.totalNumbers || 0).length, '0')}</span>`).join(' ')}</div>
+                </div>
+                <div class="actions">
+                    ${sale.status === 'pending_admin_approval' ? `
+                        <button class="action-btn" style="border-color:var(--success); color:var(--success);" onclick="approveSale(${sale.id}, ${raffleId})">Aprovar</button>
+                        <button class="action-btn" style="border-color:var(--danger); color:var(--danger);" onclick="rejectSale(${sale.id}, ${raffleId})">Rejeitar</button>` 
+                    : (sale.status === 'rejected' ? `<button class="action-btn" onclick="approveSale(${sale.id}, ${raffleId})">Re-Aprovar</button>` 
+                    : (sale.status === 'approved' ? `<button class="action-btn" style="border-color:var(--danger); color:var(--danger);" onclick="rejectSale(${sale.id}, ${raffleId})">Cancelar Aprov.</button>` : ''))}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function approveSale(saleId, raffleId) {
+    const saleIndex = db.sales.findIndex(s => s.id === saleId);
+    if (saleIndex === -1) return;
+    const sale = db.sales[saleIndex];
+    const raffle = db.raffles.find(r => r.id === raffleId);
+    if (!raffle) return;
+
+    if (sale.status !== 'approved') {
+        sale.numbers.forEach(num => {
+            if (!raffle.soldNumbers.includes(num)) {
+                raffle.soldNumbers.push(num);
+            }
+        });
+        raffle.soldNumbers.sort((a,b) => a-b);
+    }
+    db.sales[saleIndex].status = 'approved';
+    saveDB();
+    console.log(`WebApp RifaMax: Venda ID ${saleId} aprovada para rifa ID ${raffleId}.`);
+    renderAdminRaffleSalesList(raffleId);
+    updateAdminDashboard(); updateRafflesTable(); updateSalesTable();
+    if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle && currentRaffle.id === raffleId) {
+        openAdminRaffleDetailModal(raffleId); 
+    }
+}
+
+function rejectSale(saleId, raffleId) {
+    const saleIndex = db.sales.findIndex(s => s.id === saleId);
+    if (saleIndex === -1) return;
+    const sale = db.sales[saleIndex];
+    const originalStatus = sale.status;
+    db.sales[saleIndex].status = 'rejected';
+    const raffle = db.raffles.find(r => r.id === raffleId);
+    if (raffle && (originalStatus === 'approved' || originalStatus === 'pending_admin_approval')) {
+        sale.numbers.forEach(numberToRemove => {
+            const index = raffle.soldNumbers.indexOf(numberToRemove);
+            if (index > -1) raffle.soldNumbers.splice(index, 1);
+        });
+    }
+    saveDB();
+    console.log(`WebApp RifaMax: Venda ID ${saleId} rejeitada para rifa ID ${raffleId}.`);
+    renderAdminRaffleSalesList(raffleId);
+    updateAdminDashboard(); updateRafflesTable(); updateSalesTable();
+     if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle && currentRaffle.id === raffleId) {
+        openAdminRaffleDetailModal(raffleId); 
+    }
+}
+
+// Promoções
+function openAdminPromotionModal(promotionId, raffleToSetId = null) {
+    const form = document.getElementById('adminPromotionForm');
+    form.reset(); 
+    document.getElementById('promotionSpecificFields').innerHTML = '';
+    document.getElementById('promotionActiveToggle').classList.remove('active');
+
+    currentAdminRaffleIdForPromotion = raffleToSetId || (currentRaffle ? currentRaffle.id : null);
+    if (!currentAdminRaffleIdForPromotion && !promotionId) {
+        alert("Selecione uma rifa primeiro ou edite uma promoção existente.");
+        return;
+    }
+    document.getElementById('promotionRaffleId').value = currentAdminRaffleIdForPromotion;
+
+    if (promotionId) {
+        const promotion = db.promotions.find(p => p.id === promotionId);
+        if (promotion) {
+            document.getElementById('adminPromotionModalTitle').textContent = 'Editar Promoção';
+            document.getElementById('adminPromotionSubmitBtnText').textContent = 'Salvar Alterações';
+            document.getElementById('promotionEditId').value = promotion.id;
+            document.getElementById('promotionRaffleId').value = promotion.raffleId;
+            document.getElementById('promotionTitle').value = promotion.title;
+            document.getElementById('promotionType').value = promotion.type;
+            updatePromotionFields(promotion.details);
+            if (promotion.isActive) document.getElementById('promotionActiveToggle').classList.add('active');
+        }
+    } else {
+        document.getElementById('adminPromotionModalTitle').textContent = 'Adicionar Nova Promoção';
+        document.getElementById('adminPromotionSubmitBtnText').textContent = 'Criar Promoção';
+        document.getElementById('promotionEditId').value = '';
+        document.getElementById('promotionActiveToggle').classList.add('active');
+    }
+    document.getElementById('adminPromotionModal').classList.add('active');
+}
+
+function updatePromotionFields(details = null) {
+    const type = document.getElementById('promotionType').value;
+    const fieldsDiv = document.getElementById('promotionSpecificFields');
+    fieldsDiv.innerHTML = ''; 
+    if (type === 'discount_quantity_threshold') {
+        fieldsDiv.innerHTML = `
+            <div class="form-group"><label>Qtde. Mínima</label><input type="number" class="form-input" id="promoMinQuantity" min="1" required value="${details?.minQuantity || ''}"></div>
+            <div class="form-group"><label>Novo Preço/Cota</label><input type="number" class="form-input" id="promoDiscountedPrice" step="0.01" min="0.01" required value="${details?.discountedPrice || ''}"></div>`;
+    } else if (type === 'fixed_price_pack') {
+        fieldsDiv.innerHTML = `
+            <div class="form-group"><label>Qtde. Cotas Pacote</label><input type="number" class="form-input" id="promoPackQuantity" min="1" required value="${details?.packQuantity || ''}"></div>
+            <div class="form-group"><label>Preço Fixo Pacote</label><input type="number" class="form-input" id="promoPackPrice" step="0.01" min="0.01" required value="${details?.packPrice || ''}"></div>`;
+    }
+}
+
+function handleAdminPromotionSubmit(event) {
+    event.preventDefault();
+    const editId = document.getElementById('promotionEditId').value;
+    const raffleId = parseInt(document.getElementById('promotionRaffleId').value);
+    if (!raffleId) { alert("Erro: Rifa não especificada."); return; }
+
+    const promotionData = {
+        raffleId: raffleId, title: document.getElementById('promotionTitle').value,
+        type: document.getElementById('promotionType').value, 
+        isActive: document.getElementById('promotionActiveToggle').classList.contains('active'), details: {}
+    };
+    if (promotionData.type === 'discount_quantity_threshold') {
+        promotionData.details.minQuantity = parseInt(document.getElementById('promoMinQuantity').value);
+        promotionData.details.discountedPrice = parseFloat(document.getElementById('promoDiscountedPrice').value);
+    } else if (promotionData.type === 'fixed_price_pack') {
+        promotionData.details.packQuantity = parseInt(document.getElementById('promoPackQuantity').value);
+        promotionData.details.packPrice = parseFloat(document.getElementById('promoPackPrice').value);
+    }
+
+    if (editId) {
+        const promoIndex = db.promotions.findIndex(p => p.id === parseInt(editId));
+        if (promoIndex > -1) db.promotions[promoIndex] = { ...db.promotions[promoIndex], ...promotionData };
+    } else {
+        promotionData.id = Date.now();
+        promotionData.createdAt = new Date().toISOString();
+        db.promotions.push(promotionData);
+    }
+    saveDB();
+    closeModal('adminPromotionModal');
+    if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle && currentRaffle.id === raffleId) {
+         renderAdminRafflePromotionsList(raffleId);
+    }
+}
+
+function renderAdminRafflePromotionsList(raffleId) {
+    const promotionsListDiv = document.getElementById('adminRafflePromotionsList');
+    const promotionsForRaffle = db.promotions.filter(p => p.raffleId === raffleId);
+    if (promotionsForRaffle.length === 0) {
+        promotionsListDiv.innerHTML = '<p style="text-align:center; color:var(--text-secondary); margin-top:1rem;">Nenhuma promoção para esta rifa.</p>'; return;
+    }
+    promotionsListDiv.innerHTML = promotionsForRaffle.map(promo => `
+        <div class="promotion-item-admin">
+            <div><strong>${promo.title}</strong> (${promo.type}) - ${promo.isActive ? "Ativa" : "Inativa"}</div>
+            <div>
+                <button class="action-btn" onclick="openAdminPromotionModal(${promo.id}, ${raffleId})">Editar</button>
+                <button class="action-btn" style="border-color:var(--danger); color:var(--danger);" onclick="deleteAdminPromotion(${promo.id}, ${raffleId})">Apagar</button>
+            </div>
+        </div>`).join('');
+}
+
+function deleteAdminPromotion(promotionId, raffleIdContext) {
+    if (confirm('Tem certeza que deseja apagar esta promoção?')) {
+        db.promotions = db.promotions.filter(p => p.id !== promotionId);
+        saveDB();
+        if (document.getElementById('adminRaffleDetailModal').classList.contains('active') && currentRaffle && currentRaffle.id === raffleIdContext) {
+            renderAdminRafflePromotionsList(raffleIdContext);
+        }
+    }
+}
+
+
+// Ganhadores e Contato
+function renderWinners() {
+    const completedRaffles = db.raffles.filter(r => r.completedAt && r.winner);
+    const grid = document.getElementById('winnersGrid');
+    if (!grid) return;
+    if (completedRaffles.length === 0) {
+        grid.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Nenhum sorteio realizado ainda.</p>'; return;
+    }
+    grid.innerHTML = completedRaffles.sort((a,b) => new Date(b.completedAt) - new Date(a.completedAt))
+    .map(raffle => `
+        <div class="winner-card">
+            <div class="winner-name">${raffle.winner.name}</div>
+            <div class="winner-prize">${raffle.icon} ${raffle.title}</div>
+            <div class="winner-details">
+                <span>Cota: ${raffle.winner.number.toString().padStart(String(raffle.totalNumbers).length, '0')}</span>
+                <span>Data: ${new Date(raffle.completedAt).toLocaleDateString('pt-BR')}</span>
+            </div>
+        </div>`).join('');
+}
+
+function sendContact(event) {
+    event.preventDefault();
+    alert(`Obrigado pelo contato, ${document.getElementById('contactName').value}! Mensagem enviada (simulação).`);
+    event.target.reset();
+}
+
+// Gráficos (Chart.js)
+function renderActiveRafflesProgressChart() {
+    const ctx = document.getElementById('activeRafflesProgressChart')?.getContext('2d');
+    if (!ctx) return;
+    const activeRaffles = db.raffles.filter(r => !r.completedAt).slice(0, 5);
+    if (activeRafflesChartInstance) activeRafflesChartInstance.destroy();
+    activeRafflesChartInstance = new Chart(ctx, {
+        type: 'bar', data: {
+            labels: activeRaffles.map(r => r.title.substring(0,15) + (r.title.length > 15 ? '...' : '')),
+            datasets: [{ label: '% Vendida (Aprovadas)', data: activeRaffles.map(r => {
+                const approvedSoldCount = db.sales.filter(s=>s.raffleId === r.id && s.status === 'approved').reduce((sum,s)=>sum + s.numbers.length,0);
+                return r.totalNumbers > 0 ? (approvedSoldCount / r.totalNumbers * 100).toFixed(1) : 0;
+            }), backgroundColor: activeRaffles.map(() => `hsla(${Math.random()*360}, 70%, 60%, 0.7)`), borderWidth: 1 }]
+        }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, ticks: { color: 'var(--text-secondary)' }, grid: { color: 'var(--glass-border)' } }, x: { ticks: { color: 'var(--text-secondary)' }, grid: { display: false } } }, plugins: { legend: { display: false } } }
+    });
+}
+function renderSalesLast7DaysChart() {
+    const ctx = document.getElementById('salesLast7DaysChart')?.getContext('2d');
+    if (!ctx) return;
+    const salesData = { labels: [], totals: [] }; const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today); date.setDate(today.getDate() - i);
+        salesData.labels.push(date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+        let dailyTotal = 0;
+        db.sales.forEach(sale => { if (sale.status === 'approved' && new Date(sale.date).toLocaleDateString('pt-BR') === date.toLocaleDateString('pt-BR')) dailyTotal += sale.amount; });
+        salesData.totals.push(dailyTotal);
+    }
+    if (salesLast7DaysChartInstance) salesLast7DaysChartInstance.destroy();
+    salesLast7DaysChartInstance = new Chart(ctx, {
+        type: 'line', data: { labels: salesData.labels, datasets: [{ label: 'Receita Aprovada (R$)', data: salesData.totals, borderColor: 'var(--primary)', backgroundColor: 'rgba(0, 255, 136, 0.1)', fill: true, tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { color: 'var(--text-secondary)', callback: value => `R$ ${value}` }, grid: { color: 'var(--glass-border)' } }, x: { ticks: { color: 'var(--text-secondary)' }, grid: { display: false } } }, plugins: { legend: { labels: { color: 'var(--text-primary)' } } } }
+    });
+}
+
+// Ranking de Vendas e Cotas Premiadas
+function renderRaffleRanking(raffleId) {
+    const raffle = db.raffles.find(r => r.id === raffleId);
+    if (!raffle) return '<p style="text-align:center; color:var(--text-secondary);">Rifa não encontrada.</p>';
+
+    const salesByBuyer = {};
+    db.sales.filter(s => s.raffleId === raffleId && s.status === 'approved').forEach(sale => {
+        if (!salesByBuyer[sale.userId]) {
+            salesByBuyer[sale.userId] = { name: sale.userName, phone: sale.userId, count: 0 };
+        }
+        salesByBuyer[sale.userId].count += sale.numbers.length;
+    });
+
+    const sortedBuyers = Object.values(salesByBuyer).sort((a, b) => b.count - a.count);
+
+    if (sortedBuyers.length === 0) {
+        return '<p style="text-align:center; color:var(--text-secondary);">Nenhuma cota aprovada vendida para esta rifa ainda.</p>';
+    }
+
+    let rankingHtml = '<div class="ranking-container">';
+    const top3 = sortedBuyers.slice(0, 3);
+    rankingHtml += '<div class="ranking-top3">';
+    top3.forEach((buyer, index) => {
+        let medal = '';
+        if (index === 0) medal = '🥇'; 
+        else if (index === 1) medal = '🥈'; 
+        else if (index === 2) medal = '🥉'; 
+        
+        rankingHtml += `
+            <div class="ranking-top-item ranking-pos-${index + 1}">
+                <div class="ranking-medal">${medal}</div>
+                <div class="ranking-buyer-name">${buyer.name}</div>
+                <div class="ranking-buyer-quotas">${buyer.count.toLocaleString('pt-BR')} cotas</div>
+            </div>`;
+    });
+    rankingHtml += '</div>'; 
+
+    if (sortedBuyers.length > 3) {
+        rankingHtml += '<h4 class="ranking-others-title">Demais Compradores</h4>';
+        rankingHtml += '<ul class="ranking-others-list">';
+        sortedBuyers.slice(3).forEach((buyer, index) => {
+            rankingHtml += `
+                <li class="ranking-other-item">
+                    <span class="ranking-other-pos">${index + 4}.</span>
+                    <span class="ranking-other-name">${buyer.name} (${buyer.phone.slice(-4)})</span>
+                    <span class="ranking-other-quotas">${buyer.count.toLocaleString('pt-BR')} cotas</span>
+                </li>`;
+        });
+        rankingHtml += '</ul>';
+    }
+    rankingHtml += '</div>'; 
+    return rankingHtml;
+}
+
+function renderPrizeQuotas(raffleId) {
+    const raffle = db.raffles.find(r => r.id === raffleId);
+    if (!raffle || !raffle.prizeQuotas || raffle.prizeQuotas.trim() === '') {
+        return '<p style="text-align:center; color:var(--text-secondary);">Nenhuma cota premiada definida para esta rifa.</p>';
+    }
+
+    const prizeQuotaEntries = raffle.prizeQuotas.split(',')
+        .map(entry => {
+            const parts = entry.split(':');
+            const number = parseInt(parts[0]?.trim());
+            const prizeDescription = parts[1]?.trim() || "Prêmio Especial"; 
+            if (!isNaN(number) && number > 0) {
+                return { number, prizeDescription };
+            }
+            return null;
+        })
+        .filter(entry => entry !== null);
+
+    if (prizeQuotaEntries.length === 0) {
+        return '<p style="text-align:center; color:var(--text-secondary);">Nenhuma cota premiada válida definida.</p>';
+    }
+
+    let prizeQuotasHtml = '<ul class="prize-quotas-list">';
+    prizeQuotaEntries.forEach(entry => {
+        let buyerInfo = 'Disponível';
+        let buyerName = '';
+        let isBought = false;
+        for (const sale of db.sales) {
+            if (sale.raffleId === raffleId && sale.status === 'approved' && sale.numbers.includes(entry.number)) {
+                buyerName = sale.userName;
+                buyerInfo = `Comprado`;
+                isBought = true;
+                break;
+            }
+        }
+        prizeQuotasHtml += `
+            <li class="prize-quota-item ${isBought ? 'bought' : 'available'}">
+                <div class="prize-quota-desc">${entry.prizeDescription}</div>
+                <div class="prize-quota-details">
+                    <span class="prize-quota-status">${buyerInfo}</span>
+                    <span class="prize-quota-number">Cota ${entry.number.toString().padStart(String(raffle.totalNumbers).length, '0')}</span>
+                </div>
+                ${isBought && buyerName ? `<div class="prize-quota-buyer"><i class="fas fa-user"></i> ${buyerName}</div>` : ''}
+            </li>`;
+    });
+    prizeQuotasHtml += '</ul>';
+    return prizeQuotasHtml;
+}
+
+
+// Inicializar ao carregar o DOM
+document.addEventListener('DOMContentLoaded', initializeApp);
