@@ -49,6 +49,7 @@ body::before {
         radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 40% 20%, rgba(0, 255, 255, 0.1) 0%, transparent 50%);
     z-index: -2;
+    pointer-events: none;
 }
 
 .grid-bg {
@@ -63,6 +64,7 @@ body::before {
     background-size: 50px 50px;
     z-index: -1;
     animation: gridMove 20s linear infinite;
+    pointer-events: none;
 }
 
 @keyframes gridMove {
@@ -535,10 +537,16 @@ nav {
 .progress-info {
     display: flex;
     justify-content: space-between;
+    flex-wrap: wrap; 
+    gap: 0.5rem; 
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.8rem; 
     color: var(--text-secondary);
 }
+.progress-info span {
+    white-space: nowrap; 
+}
+
 
 .progress-bar {
     height: 8px;
@@ -588,7 +596,7 @@ nav {
     font-size: 1rem; 
     cursor: pointer;
     -webkit-appearance: none; 
-    -moz-appearance: none;    
+    -moz-appearance: none;     
     appearance: none;
     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300FF88%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
     background-repeat: no-repeat;
@@ -837,7 +845,7 @@ nav {
     left: 15%;
     transform: rotate(45deg);
     transform-origin: bottom left;
-    animation: drawCheckBefore 0.3s ease 0.4s forwards; /* Duração e delay ajustados */
+    animation: drawCheckBefore 0.3s ease 0.4s forwards; 
 }
 
 .success-check::after { 
@@ -847,7 +855,7 @@ nav {
     left: 45%; 
     transform: rotate(-45deg);
     transform-origin: bottom left;
-    animation: drawCheckAfter 0.5s ease 0.6s forwards; /* Duração e delay ajustados */
+    animation: drawCheckAfter 0.5s ease 0.6s forwards; 
 }
 
 
@@ -856,11 +864,11 @@ nav {
     to { transform: scale(1); }
 }
 
-@keyframes drawCheckBefore { /* Animação para a primeira parte do V */
+@keyframes drawCheckBefore { 
     to { height: 40%; } 
 }
 
-@keyframes drawCheckAfter { /* Animação para a segunda parte do V */
+@keyframes drawCheckAfter { 
     to { height: 80%; }
 }
 
@@ -959,7 +967,7 @@ nav {
     letter-spacing: 1.5px; 
 }
 
-.admin-dashboard .stat-card::before { /* Remove o ::before padrão para os cards do dashboard */
+.admin-dashboard .stat-card::before { 
     display: none;
     animation: none;
 }
@@ -1437,18 +1445,26 @@ footer {
 }
 .sale-item-admin .actions {
     display: flex;
+    flex-direction: column; /* Empilha os botões de ação */
     gap: 0.5rem; 
     flex-shrink: 0; 
+    align-items: flex-start; /* Alinha os botões à esquerda */
 }
 .sale-item-admin .actions button {
     padding: 0.4rem 0.8rem;
     font-size: 0.75rem;
+    width: 100%; /* Faz os botões ocuparem a largura disponível na coluna de ações */
+    text-align: center;
 }
 .ticket-numbers-admin {
     display: flex;
     flex-wrap: wrap;
     gap: 0.3rem;
     margin-top: 0.5rem; 
+    align-items: center; 
+}
+.ticket-numbers-admin strong {
+    margin-right: 0.5rem;
 }
 .ticket-number-admin {
     background: var(--primary);
@@ -1481,16 +1497,19 @@ footer {
 
 
 #adminRaffleSalesList::-webkit-scrollbar,
-#adminRafflePromotionsList::-webkit-scrollbar { 
+#adminRafflePromotionsList::-webkit-scrollbar,
+#adminRaffleDetailContent::-webkit-scrollbar { 
     width: 8px;
 }
 #adminRaffleSalesList::-webkit-scrollbar-thumb,
-#adminRafflePromotionsList::-webkit-scrollbar-thumb {
+#adminRafflePromotionsList::-webkit-scrollbar-thumb,
+#adminRaffleDetailContent::-webkit-scrollbar-thumb {
     background: var(--primary);
     border-radius: 4px;
 }
 #adminRaffleSalesList::-webkit-scrollbar-track,
-#adminRafflePromotionsList::-webkit-scrollbar-track {
+#adminRafflePromotionsList::-webkit-scrollbar-track,
+#adminRaffleDetailContent::-webkit-scrollbar-track {
     background: var(--glass-border);
     border-radius: 4px;
 }
@@ -1693,6 +1712,49 @@ footer {
     color: var(--text-secondary);
 }
 
+/* Estilos para Notificações do Admin */
+#adminNotificationBell.has-notifications {
+    animation: ring 1.2s ease-in-out infinite;
+    color: var(--warning); 
+}
+#adminNotificationBell.has-notifications #adminNotificationCount {
+    animation: pulseCount 1.2s ease-in-out infinite;
+}
+
+@keyframes ring {
+    0%, 100% { transform: rotate(0) scale(1); }
+    10%, 30%, 50%, 70%, 90% { transform: rotate(-10deg) scale(1.1); }
+    20%, 40%, 60%, 80% { transform: rotate(10deg) scale(1.1); }
+}
+@keyframes pulseCount {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 102, 0.7); }
+    50% { transform: scale(1.1); box-shadow: 0 0 5px 3px rgba(255, 0, 102, 0.3); }
+}
+
+/* Estilos para configuração dinâmica de cotas premiadas */
+#prizeQuotasConfigSection .prize-quota-input-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+#prizeQuotasConfigSection .prize-quota-input-group input[type="number"] {
+    flex-grow: 1;
+    max-width: 120px; 
+}
+#prizeQuotasConfigSection .prize-quota-input-group input[type="text"] {
+    flex-grow: 2;
+}
+#prizeQuotasConfigSection .prize-quota-input-group .btn {
+    padding: 0.6rem 1rem; 
+    font-size: 0.8rem;
+    background-color: var(--danger);
+    border-color: var(--danger);
+}
+#prizeQuotasConfigSection .prize-quota-input-group .btn span { 
+    color: var(--text-primary);
+}
+
 
 @media (max-width: 968px) { 
     .nav-menu { display: none; }
@@ -1700,6 +1762,7 @@ footer {
     .campaigns-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
     .stats-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
     .charts-grid { grid-template-columns: 1fr; }
+    #adminNotificationBellContainer { margin-bottom: 1rem; } 
 }
 
 @media (max-width: 768px) { 
@@ -1709,7 +1772,7 @@ footer {
     .admin-tab { padding: 0.6rem 1rem; font-size: 0.7rem; }
     .data-table { font-size: 0.9rem; }
     .data-table th, .data-table td { padding: 0.7rem; white-space: nowrap; }
-    div[style*="overflow-x: auto"] .data-table { min-width: 600px; }
+    div[style*="overflow-x: auto"] .data-table { min-width: 700px; } /* Aumentado para acomodar nova coluna de email */
     .modal-content { padding: 1.5rem; max-height: 95vh; }
     .modal-title { font-size: 1.5rem; }
     .phone-input-group { flex-direction: column; }
@@ -1723,7 +1786,10 @@ footer {
     .main-raffle-card { padding: 2rem; }
     .footer-content { grid-template-columns: 1fr; text-align: center; }
     .footer-section a, .footer-section p { text-align: center; }
-    .ranking-top-item { width: calc(50% - 1rem); } /* 2 por linha no top3 em mobile */
+    .ranking-top-item { width: calc(50% - 1rem); } 
+    .progress-info { font-size: 0.75rem; } 
+    #prizeQuotasConfigSection .prize-quota-input-group { flex-direction: column; align-items: stretch;}
+    #prizeQuotasConfigSection .prize-quota-input-group input[type="number"] { max-width: none; }
 }
 
 @media (max-width: 480px) { 
@@ -1741,8 +1807,10 @@ footer {
     #raffleDetailsContainer h2 { font-size: 1.6rem;   }
     #raffleDetailsContainer h3 { font-size: 1.2rem;   }
     .modal-content { padding: 1rem; }
-    .adminRaffleDetailModal .modal-content { padding: 1.5rem; }
-    .ranking-top-item { width: 100%; } /* 1 por linha no top3 em mobile pequeno */
-    .prize-quotas-list { grid-template-columns: 1fr; } /* 1 por linha em mobile pequeno */
+    #adminRaffleDetailModal .modal-content { padding: 1.5rem; } 
+    .ranking-top-item { width: 100%; } 
+    .prize-quotas-list { grid-template-columns: 1fr; } 
+    .progress-info { flex-direction: column; align-items: center; text-align: center; } 
+    .progress-info span { margin-bottom: 0.3rem; }
 }
 
