@@ -6,6 +6,7 @@
     <title>RifaMax - O Futuro das Rifas</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <div class="grid-bg"></div>
@@ -43,7 +44,7 @@
             <a href="#" class="nav-link" onclick="showPage('my-tickets'); toggleMobileMenu()">Minhas Cotas</a>
             <a href="#" class="nav-link" onclick="showPage('terms'); toggleMobileMenu()">Termos</a>
             <a href="#" class="nav-link" onclick="showPage('contact'); toggleMobileMenu()">Contato</a>
-            <button class="btn btn-primary" style="margin-top: 2rem;" onclick="openLoginModal(); toggleMobileMenu()">
+            <button class="btn btn-primary" style="margin-top: 2rem;" id="mobileAuthBtn" onclick="openLoginModal(); toggleMobileMenu()">
                 <span>Entrar</span>
             </button>
         </nav>
@@ -89,31 +90,39 @@
 
         <div class="page" id="admin">
             <div class="container">
-                <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem; color: var(--primary);">
-                    Painel de Controle
-                </h2>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-size: 2.5rem; margin-bottom: 3rem; color: var(--primary);">
+                        Painel de Controle
+                    </h2>
+                    <div id="adminNotificationBellContainer" style="position: relative; margin-bottom: 3rem;">
+                         <span id="adminNotificationBell" style="position: relative; cursor: pointer; font-size: 1.8rem;" onclick="showAdminTab('sales')" title="Vendas Pendentes">
+                            <i class="fas fa-bell"></i>
+                            <span id="adminNotificationCount" style="position: absolute; top: -10px; right: -10px; background: var(--danger); color: white; border-radius: 50%; padding: 3px 7px; font-size: 0.75rem; display: inline-block; line-height:1; border: 1px solid var(--bg-primary);">0</span>
+                        </span>
+                    </div>
+                </div>
                 
                 <div class="admin-panel">
                     <div class="admin-tabs">
                         <button class="admin-tab active" onclick="showAdminTab('dashboard')">Dashboard</button>
                         <button class="admin-tab" onclick="showAdminTab('raffles')">Rifas</button>
                         <button class="admin-tab" onclick="showAdminTab('sales')">Vendas</button>
-                        <button class="admin-tab" onclick="showAdminTab('create')">Nova Rifa</button>
+                        <button class="admin-tab" onclick="handleNewRaffleTabClick()">Nova Rifa</button>
                     </div>
 
                     <div class="admin-content active" id="admin-dashboard">
                         <div class="stats-grid">
                             <div class="stat-card">
                                 <div class="stat-number" id="totalRevenue">R$ 0</div>
-                                <div class="stat-label">Receita Total</div>
+                                <div class="stat-label">Receita Total (Aprov.)</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="totalTickets">0</div>
-                                <div class="stat-label">Cotas Vendidas</div>
+                                <div class="stat-label">Cotas Vendidas (Aprov.)</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="activeUsers">0</div>
-                                <div class="stat-label">Usuários Ativos</div>
+                                <div class="stat-label">Usuários Compradores</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="activeRaffles">0</div>
@@ -126,7 +135,7 @@
                                 <canvas id="activeRafflesProgressChart"></canvas>
                             </div>
                             <div class="cyber-card chart-container">
-                                <h4 style="color: var(--primary); margin-bottom: 1rem; text-align: center;">Vendas nos Últimos 7 Dias</h4>
+                                <h4 style="color: var(--primary); margin-bottom: 1rem; text-align: center;">Vendas (Aprov.) nos Últimos 7 Dias</h4>
                                 <canvas id="salesLast7DaysChart"></canvas>
                             </div>
                         </div>
@@ -166,17 +175,18 @@
                     </div>
 
                     <div class="admin-content" id="admin-sales">
-                        <h3 style="margin-bottom: 1.5rem;">Histórico de Vendas</h3>
+                        <h3 style="margin-bottom: 1.5rem;">Histórico de Vendas (Todas as Campanhas)</h3>
                         <div style="overflow-x: auto;">
                             <table class="data-table">
                                 <thead>
                                     <tr>
                                         <th>Data</th>
-                                        <th>Cliente</th>
+                                        <th>Cliente (Telefone / Email)</th>
                                         <th>Rifa</th>
                                         <th>Cotas</th>
                                         <th>Valor</th>
                                         <th>Status</th>
+                                        <th>Ações Email</th>
                                     </tr>
                                 </thead>
                                 <tbody id="salesTableBody"></tbody>
@@ -223,14 +233,28 @@
                                 <label>Ícone (Emoji)</label>
                                 <input type="text" class="form-input" id="raffleIcon" placeholder="Ex: 📱" maxlength="2">
                             </div>
-                            <div class="form-group">
-                                <label>Cotas Premiadas (formato: numero:prêmio,numero:prêmio)</label>
-                                <input type="text" class="form-input" id="rafflePrizeQuotas" placeholder="Ex: 10:Prêmio R$50,50:Bônus,100:Vale Compras">
-                            </div>
-                            <div class="cyber-toggle">
+                            
+                            <div class="cyber-toggle" style="margin-bottom: 1rem;">
                                 <div class="toggle-switch" id="highlightToggle" onclick="this.classList.toggle('active')"></div>
                                 <label>Destacar como rifa principal</label>
                             </div>
+
+                            <div class="cyber-toggle" style="margin-bottom: 1.5rem;">
+                                <div class="toggle-switch" id="activatePrizeQuotasToggle" onclick="this.classList.toggle('active'); togglePrizeQuotasConfig();"></div>
+                                <label>Ativar cotas premiadas</label>
+                            </div>
+
+                            <div id="prizeQuotasConfigSection" style="display: none; background: var(--bg-tertiary); padding: 1.5rem; border-radius: 15px; margin-bottom: 2rem; border: 1px solid var(--glass-border);">
+                                <h4 style="color: var(--primary); margin-bottom: 1.5rem; text-align: center;">Configurar Cotas Premiadas</h4>
+                                <div id="prizeQuotasDynamicInputsContainer">
+                                    </div>
+                                <button type="button" class="btn" onclick="addPrizeQuotaInput()" style="margin-top: 1rem; width: 100%; background-color: var(--primary-dark); border-color: var(--primary-dark);">
+                                    <span>Adicionar Cota Premiada</span>
+                                </button>
+                            </div>
+                            <input type="hidden" id="rafflePrizeQuotasHidden">
+
+
                             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 2rem;">
                                 <span id="createRaffleSubmitBtnText">Criar Rifa</span>
                             </button>
@@ -260,6 +284,11 @@
                         <div class="phone-input-group" style="flex: 1;">
                             <select class="country-select" id="countryCode">
                                 <option value="+55">🇧🇷 +55</option>
+                                <option value="+351">🇵🇹 +351</option>
+                                <option value="+33">🇫🇷 +33</option>
+                                <option value="+39">🇮🇹 +39</option>
+                                <option value="+32">🇧🇪 +32</option>
+                                <option value="+31">🇳🇱 +31</option>
                             </select>
                             <input type="tel" class="form-input" id="phoneSearch" placeholder="(00) 00000-0000">
                         </div>
@@ -284,7 +313,7 @@
                     </p>
                     <h3 style="color: var(--primary); margin: 2rem 0 1rem;">3. Pagamentos</h3>
                     <p style="color: var(--text-secondary); line-height: 1.8;">
-                        Aceitamos PIX e cartões. Todos os pagamentos são processados com segurança.
+                        Processamos pagamentos através de integrações seguras com gateways.
                     </p>
                     <h3 style="color: var(--primary); margin: 2rem 0 1rem;">4. Sorteios</h3>
                     <p style="color: var(--text-secondary); line-height: 1.8;">
@@ -312,6 +341,11 @@
                             <div class="phone-input-group">
                                 <select class="country-select" id="contactCountryCode">
                                     <option value="+55">🇧🇷 +55</option>
+                                    <option value="+351">🇵🇹 +351</option>
+                                    <option value="+33">🇫🇷 +33</option>
+                                    <option value="+39">🇮🇹 +39</option>
+                                    <option value="+32">🇧🇪 +32</option>
+                                    <option value="+31">🇳🇱 +31</option>
                                 </select>
                                 <input type="tel" class="form-input" id="contactPhone" required>
                             </div>
@@ -332,7 +366,7 @@
         </div>
     </div>
 
-    <div class="fab" onclick="scrollToTop()"><i>⬆</i></div>
+    <div class="fab" onclick="scrollToTop()"><i><i class="fas fa-arrow-up"></i></i></div>
 
     <footer>
         <div class="container">
@@ -372,6 +406,11 @@
                     <div class="phone-input-group">
                         <select class="country-select" id="loginCountryCode">
                             <option value="+55">🇧🇷 +55</option>
+                            <option value="+351">🇵🇹 +351</option>
+                            <option value="+33">🇫🇷 +33</option>
+                            <option value="+39">🇮🇹 +39</option>
+                            <option value="+32">🇧🇪 +32</option>
+                            <option value="+31">🇳🇱 +31</option>
                             <option value="+1">🇺🇸 +1</option>
                         </select>
                         <input type="tel" class="form-input" id="loginPhone" placeholder="(00) 00000-0000" required>
@@ -392,6 +431,7 @@
                 <h2 class="modal-title" id="purchaseTitle">Comprar Cotas</h2>
                 <button class="close-modal" onclick="closeModal('purchaseModal')">✕</button>
             </div>
+            
             <div id="purchasePromoInfo" style="display:none; margin-bottom: 1rem;"></div>
             <div class="cyber-card" style="margin-bottom: 2rem;">
                 <h4 style="color: var(--primary); margin-bottom: 1rem;">📋 Regulamento e Detalhes</h4>
@@ -421,18 +461,31 @@
             <div style="text-align: center; margin: 2rem 0; padding: 1.5rem; background: var(--glass-bg); border-radius: 15px;">
                 <h3 style="color: var(--primary); font-size: 2rem;" id="totalPrice">R$ 0,00</h3>
             </div>
-            <h4 style="margin-bottom: 1rem;">Forma de Pagamento</h4>
-            <div class="payment-methods">
-                <div class="payment-method" onclick="selectPayment('pix')">
-                    <div class="payment-icon">📱</div>
-                    <div>PIX</div>
-                </div>
-                <div class="payment-method" onclick="selectPayment('card')">
-                    <div class="payment-icon">💳</div>
-                    <div>Cartão</div>
+
+            <div id="emailStep" style="display: none; margin-bottom: 2rem; padding: 1.5rem; background: var(--bg-tertiary); border-radius: 15px;">
+                <h4 style="color: var(--primary); margin-bottom: 1rem;">Confirme seu Email</h4>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">Precisamos do seu email para enviar o comprovante e informações sobre a rifa.</p>
+                <form id="purchaseEmailForm" onsubmit="handlePurchaseEmailSubmit(event)">
+                    <div class="form-group">
+                        <label for="purchaseUserEmail">Seu Email</label>
+                        <input type="email" class="form-input" id="purchaseUserEmail" placeholder="seu@email.com" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;"><span>Continuar para Pagamento</span></button>
+                </form>
+            </div>
+            
+            <div id="paymentSelectionStep">
+                <h4 style="margin-bottom: 1rem;">Forma de Pagamento</h4>
+                <div class="payment-methods">
+                    <div class="payment-method" onclick="selectPayment('stripe')"> <div class="payment-icon">💳</div>
+                        <div>Cartão / PIX (Stripe)</div>
+                    </div>
+                    {/* Removida opção PIX separada se Stripe Checkout for lidar com PIX */}
                 </div>
             </div>
-            <div id="paymentDetails" style="margin-top: 2rem;"></div>
+
+            <div id="paymentDetails" style="margin-top: 2rem; display: none;"> 
+                </div>
         </div>
     </div>
 
@@ -447,9 +500,10 @@
                     <div class="success-circle"><div class="success-check"></div></div>
                 </div>
                 <h3 style="color: var(--primary); margin-bottom: 1rem;">Parabéns!</h3>
-                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Sua compra foi processada com sucesso</p>
-                <div style="background: var(--glass-bg); border-radius: 15px; padding: 1.5rem; margin-bottom: 2rem;">
-                    <h4 style="color: var(--primary); margin-bottom: 1rem;">Seus Números da Sorte:</h4>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">Seu pagamento está sendo processado.</p>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Você será notificado por email assim que for confirmado e suas cotas liberadas.</p>
+                <div id="successNumbersContainer" style="display:none; background: var(--glass-bg); border-radius: 15px; padding: 1.5rem; margin-bottom: 2rem;">
+                    <h4 style="color: var(--primary); margin-bottom: 1rem;">Seus Números da Sorte (serão confirmados após aprovação):</h4>
                     <div class="ticket-numbers" id="successNumbers"></div>
                 </div>
                 <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('successModal'); showPage('my-tickets');"><span>Ver Minhas Cotas</span></button>
@@ -487,14 +541,15 @@
                 <h2 class="modal-title" id="adminRaffleDetailTitle">Detalhes da Rifa</h2>
                 <button class="close-modal" onclick="closeModal('adminRaffleDetailModal')">✕</button>
             </div>
-            <div id="adminRaffleDetailContent"></div>
-            <div class="detail-card" style="grid-column: 1 / -1; text-align:right; margin-top:1rem;">
-                 <button class="btn" id="adminEditRaffleBtnFromDetail" style="border-color:var(--warning); color:var(--warning);">
+            <div id="adminRaffleDetailContent" style="max-height: calc(95vh - 250px); overflow-y: auto; padding-right:10px;">
+                </div>
+            <div class="detail-card" style="grid-column: 1 / -1; text-align:right; margin-top:1rem; padding-top:1rem; border-top: 1px solid var(--glass-border);">
+                <button class="btn" id="adminEditRaffleBtnFromDetail" style="border-color:var(--warning); color:var(--warning);">
                     <span>✏️ Editar Rifa</span>
                 </button>
             </div>
             <div id="adminRaffleSalesManagement" style="margin-top: 2rem;">
-                <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Gerenciamento de Vendas</h3>
+                <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Gerenciamento de Vendas (Desta Rifa)</h3>
                 <div id="adminRaffleSalesList" style="max-height: 300px; overflow-y: auto; padding-right: 10px;"></div>
             </div>
             <div id="adminRafflePromotionsManagement" style="margin-top: 2rem;">
@@ -503,7 +558,7 @@
                 <div id="adminRafflePromotionsList" style="margin-top: 1rem;"></div>
             </div>
             <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border); text-align: right;">
-                 <button class="btn btn-primary" id="adminCompleteRaffleBtn" style="display:none;">
+                <button class="btn btn-primary" id="adminCompleteRaffleBtn" style="display:none;">
                     <span>Marcar como Concluída e Sortear</span>
                 </button>
             </div>
@@ -542,6 +597,18 @@
             </form>
         </div>
     </div>
+
+    <div class="modal" id="viewAllTicketsModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="viewAllTicketsTitle">Cotas da Venda</h2>
+                <button class="close-modal" onclick="closeModal('viewAllTicketsModal')">✕</button>
+            </div>
+            <div id="viewAllTicketsContent" class="ticket-numbers" style="max-height: 300px; overflow-y: auto; padding: 1rem; background: var(--bg-tertiary); border-radius: 10px;">
+            </div>
+        </div>
+    </div>
+
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
