@@ -9,7 +9,7 @@ let editingRaffleId = null;
 let currentAdminRaffleIdForPromotion = null; 
 
 // URL do seu backend (ajuste conforme necessário)
-const BACKEND_URL = 'https://edf8-149-102-242-98.ngrok-free.app'; // Ou a URL do seu backend em produção
+const BACKEND_URL = 'https://9a7e-149-102-242-98.ngrok-free.app'; // Ou a URL do seu backend em produção
 
 // Chave Publicável do Stripe (segura para usar no frontend)
 // IMPORTANTE: Substitua pela sua chave publicável REAL do Stripe
