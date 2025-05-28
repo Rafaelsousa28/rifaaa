@@ -1,4 +1,14 @@
 // Variáveis Globais
+
+// Versão do banco de dados para forçar atualização (evita cache no celular)
+const DB_VERSION = 2;
+const savedVersion = localStorage.getItem('rifamaxDBVersion');
+if (parseInt(savedVersion) !== DB_VERSION) {
+    console.log("Versão do DB mudou. Limpando cache localStorage.");
+    localStorage.removeItem('rifamaxDB');
+    localStorage.setItem('rifamaxDBVersion', DB_VERSION);
+}
+
 let currentUser = null; 
 let currentRaffle = null; 
 let selectedQuantity = 1;
@@ -9,7 +19,7 @@ let editingRaffleId = null;
 let currentAdminRaffleIdForPromotion = null; 
 
 // URL do seu backend (ajuste conforme necessário)
-const BACKEND_URL = 'https://16a5-149-102-242-98.ngrok-free.app'; // Ou a URL do seu backend em produção
+const BACKEND_URL = window.location.origin.replace('www.', 'api.'); // Ou a URL do seu backend em produção
 
 // Chave Publicável do Stripe (segura para usar no frontend)
 // IMPORTANTE: Substitua pela sua chave publicável REAL do Stripe
@@ -1950,6 +1960,9 @@ function addPrizeQuotaInput(number = '', prize = '') {
     container.appendChild(newInputGroup);
 }
 
+
+// Inicializar ao carregar o DOM
+document.addEventListener('DOMContentLoaded', initializeApp);
 
 // Inicializar ao carregar o DOM
 document.addEventListener('DOMContentLoaded', initializeApp);
